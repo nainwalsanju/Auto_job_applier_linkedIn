@@ -1,10 +1,14 @@
 import google.generativeai as genai
-from config.secrets import llm_model, llm_api_key
+from config.secure_config import get_ai_config
 from config.settings import showAiErrorAlerts
 from modules.helpers import print_lg, critical_error_log, convert_to_json
 from modules.ai.prompts import *
 from pyautogui import confirm
 from typing import Literal
+
+# Load configuration from secure config (environment variables)
+ai_config = get_ai_config()
+
 
 def gemini_get_models_list():
     """
@@ -12,7 +16,11 @@ def gemini_get_models_list():
     """
     try:
         print_lg("Getting Gemini models list...")
-        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        models = [
+            m.name
+            for m in genai.list_models()
+            if "generateContent" in m.supported_generation_methods
+        ]
         print_lg("Available models:")
         for model in models:
             print_lg(f"- {model}")
@@ -21,6 +29,7 @@ def gemini_get_models_list():
         critical_error_log("Error occurred while getting Gemini models list!", e)
         return ["error", e]
 
+
 def gemini_create_client():
     """
     Configures the Gemini client and validates the selected model.
@@ -28,32 +37,41 @@ def gemini_create_client():
     """
     try:
         print_lg("Configuring Gemini client...")
-        if not llm_api_key or "YOUR_API_KEY" in llm_api_key:
-            raise ValueError("Gemini API key is not set. Please set it in `config/secrets.py`.")
-        
-        genai.configure(api_key=llm_api_key)
-        
+        if not ai_config.llm_api_key:
+            raise ValueError(
+                "Gemini API key is not set. Please set it in your .env file or environment variables (LLM_API_KEY)."
+            )
+
+        genai.configure(api_key=ai_config.llm_api_key)
+
         models = gemini_get_models_list()
         if "error" in models:
             raise ValueError(models[1])
-        if not any(llm_model in m for m in models):
-             raise ValueError(f"Model `{llm_model}` is not found or not available for content generation!")
+        if not any(ai_config.llm_model in m for m in models):
+            raise ValueError(
+                f"Model `{ai_config.llm_model}` is not found or not available for content generation!"
+            )
 
-        model = genai.GenerativeModel(llm_model)
-        
+        model = genai.GenerativeModel(ai_config.llm_model)
+
         print_lg("---- SUCCESSFULLY CONFIGURED GEMINI CLIENT! ----")
-        print_lg(f"Using Model: {llm_model}")
-        print_lg("Check './config/secrets.py' for more details.\n")
+        print_lg(f"Using Model: {ai_config.llm_model}")
+        print_lg("Check your .env file or environment variables for more details.\n")
         print_lg("---------------------------------------------")
-        
+
         return model
     except Exception as e:
         error_message = f"Error occurred while configuring Gemini client. Make sure your API key and model name are correct."
         critical_error_log(error_message, e)
         if showAiErrorAlerts:
-            if "Pause AI error alerts" == confirm(f"{error_message}\n{str(e)}", "Gemini Connection Error", ["Pause AI error alerts", "Okay Continue"]):
+            if "Pause AI error alerts" == confirm(
+                f"{error_message}\n{str(e)}",
+                "Gemini Connection Error",
+                ["Pause AI error alerts", "Okay Continue"],
+            ):
                 showAiErrorAlerts = False
         return None
+
 
 def gemini_completion(model, prompt: str, is_json: bool = False) -> dict | str:
     """
@@ -91,10 +109,13 @@ def gemini_completion(model, prompt: str, is_json: bool = False) -> dict | str:
 
         print_lg(f"Calling Gemini API for completion...")
         response = model.generate_content(prompt, safety_settings=safety_settings)
-        
+
         # The response might be blocked. Check for that.
         if not response.parts:
-             raise ValueError("The response from the Gemini API was empty. This might be due to the safety filters blocking the prompt or the response. The prompt was:\n" + prompt)
+            raise ValueError(
+                "The response from the Gemini API was empty. This might be due to the safety filters blocking the prompt or the response. The prompt was:\n"
+                + prompt
+            )
 
         result = response.text
 
@@ -104,13 +125,14 @@ def gemini_completion(model, prompt: str, is_json: bool = False) -> dict | str:
                 result = result[7:]
             if result.endswith("```"):
                 result = result[:-3]
-            
+
             return convert_to_json(result)
-        
+
         return result
     except Exception as e:
         critical_error_log(f"Error occurred while getting Gemini completion!", e)
         return {"error": str(e)}
+
 
 def gemini_extract_skills(model, job_description: str) -> list[str] | None:
     """
@@ -121,17 +143,26 @@ def gemini_extract_skills(model, job_description: str) -> list[str] | None:
     """
     try:
         print_lg("Extracting skills from job description using Gemini...")
-        prompt = extract_skills_prompt.format(job_description) + "\n\nImportant: Respond with only the JSON object, without any markdown formatting or other text."
+        prompt = (
+            extract_skills_prompt.format(job_description)
+            + "\n\nImportant: Respond with only the JSON object, without any markdown formatting or other text."
+        )
         return gemini_completion(model, prompt, is_json=True)
     except Exception as e:
         critical_error_log("Error occurred while extracting skills with Gemini!", e)
         return {"error": str(e)}
 
+
 def gemini_answer_question(
     model,
-    question: str, options: list[str] | None = None, 
-    question_type: Literal['text', 'textarea', 'single_select', 'multiple_select'] = 'text', 
-    job_description: str = None, about_company: str = None, user_information_all: str = None
+    question: str,
+    options: list[str] | None = None,
+    question_type: Literal[
+        "text", "textarea", "single_select", "multiple_select"
+    ] = "text",
+    job_description: str = None,
+    about_company: str = None,
+    user_information_all: str = None,
 ) -> str:
     """
     Answers a question using the Gemini API.
@@ -141,17 +172,19 @@ def gemini_answer_question(
         user_info = user_information_all or ""
         prompt = ai_answer_prompt.format(user_info, question)
 
-        if options and (question_type in ['single_select', 'multiple_select']):
-            options_str = "OPTIONS:\n" + "\n".join([f"- {option}" for option in options])
+        if options and (question_type in ["single_select", "multiple_select"]):
+            options_str = "OPTIONS:\n" + "\n".join(
+                [f"- {option}" for option in options]
+            )
             prompt += f"\n\n{options_str}"
-            if question_type == 'single_select':
+            if question_type == "single_select":
                 prompt += "\n\nPlease select exactly ONE option from the list above."
             else:
                 prompt += "\n\nYou may select MULTIPLE options from the list above if appropriate."
-        
+
         if job_description:
             prompt += f"\n\nJOB DESCRIPTION:\n{job_description}"
-        
+
         if about_company:
             prompt += f"\n\nABOUT COMPANY:\n{about_company}"
 
