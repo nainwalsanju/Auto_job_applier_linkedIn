@@ -355,7 +355,7 @@ def ai_evaluate_resume(
     about_company: str,
     required_skills: dict,
     resume: str,
-    stream: bool = stream_output,
+    stream: bool = None,
 ) -> dict | ValueError:
     pass
 
@@ -366,7 +366,7 @@ def ai_evaluate_resume(
     about_company: str,
     required_skills: dict,
     resume: str,
-    stream: bool = stream_output,
+    stream: bool = None,
 ) -> dict | ValueError:
     pass
 
@@ -375,7 +375,7 @@ def ai_check_job_relevance(
     client: OpenAI,
     job_description: str,
     about_company: str,
-    stream: bool = stream_output,
+    stream: bool = None,
 ) -> dict:
     pass
 

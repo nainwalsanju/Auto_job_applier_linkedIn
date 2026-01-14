@@ -69,7 +69,7 @@ def deepseek_completion(
     messages: list[dict],
     response_format: dict = None,
     temperature: float = 0,
-    stream: bool = stream_output,
+    stream: bool = None,
 ) -> dict | ValueError:
     """
     Completes a chat using DeepSeek API and formats the results.
@@ -82,12 +82,21 @@ def deepseek_completion(
     """
     if not client:
         raise ValueError("DeepSeek client is not available!")
-    ##> ------ Tim L : tulxoro - Improvement ------
+
+    # Use config value if stream is not specified
+    if stream is None:
+        stream = ai_config.stream_output
+
     # Set up parameters for the API call
-    params = {"model": llm_model, "messages": messages, "stream": stream, "timeout": 30}
+    params = {
+        "model": ai_config.llm_model,
+        "messages": messages,
+        "stream": stream,
+        "timeout": 30,
+    }
 
     # Add temperature if supported
-    if deepseek_model_supports_temperature(llm_model):
+    if deepseek_model_supports_temperature(ai_config.llm_model):
         params["temperature"] = temperature
 
     # Add response format if needed (DeepSeek uses OpenAI-compatible API)
@@ -97,10 +106,9 @@ def deepseek_completion(
     try:
         # Make the API call
         print_lg(f"Calling DeepSeek API for completion...")
-        print_lg(f"Using model: {llm_model}")
+        print_lg(f"Using model: {ai_config.llm_model}")
         print_lg(f"Message count: {len(messages)}")
         completion = client.chat.completions.create(**params)
-        ##<
         result = ""
 
         # Process the response
@@ -167,7 +175,7 @@ def deepseek_completion(
 
 
 def deepseek_extract_skills(
-    client: OpenAI, job_description: str, stream: bool = stream_output
+    client: OpenAI, job_description: str, stream: bool = None
 ) -> dict | ValueError:
     """
     Function to extract skills from job description using DeepSeek API.
@@ -178,6 +186,10 @@ def deepseek_extract_skills(
     """
     try:
         print_lg("Extracting skills from job description using DeepSeek...")
+
+        # Use config value if stream is not specified
+        if stream is None:
+            stream = ai_config.stream_output
 
         # Using optimized DeepSeek prompt
         prompt = deepseek_extract_skills_prompt.format(job_description)
@@ -214,7 +226,7 @@ def deepseek_answer_question(
     job_description: str = None,
     about_company: str = None,
     user_information_all: str = None,
-    stream: bool = stream_output,
+    stream: bool = None,
 ) -> dict | ValueError:
     """
     Function to answer a question using DeepSeek AI.
@@ -228,6 +240,10 @@ def deepseek_answer_question(
     """
     try:
         print_lg(f"Answering question using DeepSeek AI: {question}")
+
+        # Use config value if stream is not specified
+        if stream is None:
+            stream = ai_config.stream_output
 
         # Prepare user information
         user_info = user_information_all or ""
