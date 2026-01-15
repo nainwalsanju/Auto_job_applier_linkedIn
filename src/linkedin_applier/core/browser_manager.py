@@ -64,39 +64,26 @@ class BrowserManager:
             return
 
         try:
-            try:
-                import undetected_chromedriver as uc
-
-                use_stealth = True
-            except ImportError:
-                print("undetected-chromedriver not available, falling back to regular Chrome")
-                from selenium import webdriver
-
-                uc = None
-                use_stealth = False
+            # Use only regular selenium webdriver - undetected-chromedriver has compatibility issues
+            from selenium import webdriver
+            from selenium.webdriver.chrome.options import Options
+            from selenium.webdriver.chrome.service import Service
+            from webdriver_manager.chrome import ChromeDriverManager
 
             from selenium.webdriver.common.by import By
             from selenium.webdriver.support.ui import WebDriverWait
             from selenium.webdriver.support import expected_conditions as EC
             from selenium.webdriver.common.action_chains import ActionChains
 
-            print(
-                f"Initializing browser... headless={self.headless}, stealth={self.stealth_mode}, use_stealth_driver={use_stealth}"
-            )
+            print(f"Initializing browser... headless={self.headless}, stealth={self.stealth_mode}")
 
-            # Configure Chrome options - use minimal, compatible options
-            if use_stealth:
-                options = uc.ChromeOptions()
-            else:
-                from selenium.webdriver.chrome.options import Options
+            # Configure Chrome options - minimal and stable
+            options = Options()
 
-                options = Options()
-
-            # Basic options only - avoid problematic ones
             if self.headless:
                 options.add_argument("--headless")
 
-            # Essential options for stability
+            # Essential stable options only
             options.add_argument("--no-sandbox")
             options.add_argument("--disable-dev-shm-usage")
             options.add_argument("--window-size=1920,1080")
@@ -107,69 +94,24 @@ class BrowserManager:
             if self.profile_dir:
                 options.add_argument(f"--profile-directory={self.profile_dir}")
 
-            # Minimal stealth options - avoid aggressive ones that cause crashes
-            if self.stealth_mode and use_stealth:
-                # Very basic stealth - remove automation indicators
+            # Basic stealth options (if requested)
+            if self.stealth_mode:
                 options.add_argument("--disable-blink-features=AutomationControlled")
-                # Remove the webdriver property
-                options.add_experimental_option("useAutomationExtension", False)
 
-            # Initialize driver with better error handling
-            if use_stealth:
+            # Initialize driver with webdriver-manager
+            try:
+                service = Service(ChromeDriverManager().install())
+                self.driver = webdriver.Chrome(service=service, options=options)
+                print("Browser initialized successfully")
+            except Exception as e:
+                print(f"Webdriver-manager failed: {e}")
+                # Fallback without webdriver-manager
                 try:
-                    # Try with automatic version detection first
-                    self.driver = uc.Chrome(options=options)
-                except Exception as e:
-                    print(f"Failed with automatic version detection: {e}")
-                    # Fallback to manual version detection
-                    try:
-                        self.driver = uc.Chrome(options=options, version_main=None)
-                    except Exception as e2:
-                        print(f"Failed with manual version detection: {e2}")
-                        # Last resort: try without version specification
-                        try:
-                            # Create options without problematic settings
-                            simple_options = uc.ChromeOptions()
-                            simple_options.add_argument("--no-sandbox")
-                            simple_options.add_argument("--disable-dev-shm-usage")
-                            if self.headless:
-                                simple_options.add_argument("--headless")
-                            simple_options.add_argument("--window-size=1920,1080")
-                            self.driver = uc.Chrome(options=simple_options)
-                            print("Browser initialized with minimal options")
-                        except Exception as e3:
-                            print(f"All browser initialization attempts failed: {e3}")
-                            raise
-            else:
-                # Use regular selenium webdriver
-                try:
-                    from selenium.webdriver.chrome.service import Service
-                    from webdriver_manager.chrome import ChromeDriverManager
-
-                    # Try to use webdriver-manager for automatic chromedriver management
-                    try:
-                        service = Service(ChromeDriverManager().install())
-                        self.driver = webdriver.Chrome(service=service, options=options)
-                        print("Browser initialized with webdriver-manager")
-                    except ImportError:
-                        # webdriver-manager not available, try direct path
-                        self.driver = webdriver.Chrome(options=options)
-                        print("Browser initialized with direct chromedriver")
-                except Exception as e:
-                    print(f"Regular Chrome driver failed: {e}")
-                    # Try with minimal options
-                    try:
-                        minimal_options = Options()
-                        minimal_options.add_argument("--no-sandbox")
-                        minimal_options.add_argument("--disable-dev-shm-usage")
-                        if self.headless:
-                            minimal_options.add_argument("--headless")
-                        minimal_options.add_argument("--window-size=1920,1080")
-                        self.driver = webdriver.Chrome(options=minimal_options)
-                        print("Browser initialized with minimal options (regular driver)")
-                    except Exception as e2:
-                        print(f"All driver initialization attempts failed: {e2}")
-                        raise
+                    self.driver = webdriver.Chrome(options=options)
+                    print("Browser initialized successfully (fallback)")
+                except Exception as e2:
+                    print(f"System chromedriver failed: {e2}")
+                    raise
 
             # Set implicit wait (default 10 seconds)
             implicit_wait = getattr(settings, "implicit_wait", 10)
@@ -189,11 +131,7 @@ class BrowserManager:
                 )
 
             self._initialized = True
-            print("Browser initialized successfully")
-
-        except ImportError:
-            print("Note: undetected-chromedriver not installed. Browser functionality limited.")
-            self._initialized = True
+            print("Browser initialization complete")
         except Exception as e:
             print(f"Failed to initialize browser: {e}")
             raise
