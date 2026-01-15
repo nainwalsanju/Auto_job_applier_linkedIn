@@ -93,19 +93,36 @@ class Logger:
 
             processors.append(write_to_file)
 
-            try:
-                log_level_enum = getattr(structlog, log_level.upper())
-            except AttributeError:
-                log_level_enum = structlog.INFO
+            # Use standard logging levels since structlog doesn't have them
+            import logging
 
-            structlog.configure(
-                processors=processors,
-                wrapper_class=structlog.make_filtering_bound_logger(log_level_enum),
-                logger_factory=structlog.PrintLoggerFactory(
-                    file=sys.stderr if console_output else open(os.devnull, "w")
-                ),
-                cache_logger_on_first_use=True,
-            )
+            log_level_map = {
+                "DEBUG": logging.DEBUG,
+                "INFO": logging.INFO,
+                "WARNING": logging.WARNING,
+                "ERROR": logging.ERROR,
+                "CRITICAL": logging.CRITICAL,
+            }
+            log_level_enum = log_level_map.get(log_level.upper(), logging.INFO)
+
+            try:
+                structlog.configure(
+                    processors=processors,
+                    wrapper_class=structlog.make_filtering_bound_logger(log_level_enum),
+                    logger_factory=structlog.PrintLoggerFactory(
+                        file=sys.stderr if console_output else open(os.devnull, "w")
+                    ),
+                    cache_logger_on_first_use=True,
+                )
+            except AttributeError:
+                # Fallback if structlog methods don't exist
+                structlog.configure(
+                    processors=processors,
+                    logger_factory=structlog.PrintLoggerFactory(
+                        file=sys.stderr if console_output else open(os.devnull, "w")
+                    ),
+                    cache_logger_on_first_use=True,
+                )
 
         self.logger = structlog.get_logger(self.name) if STRUCTLOG_AVAILABLE else None
         self._initialized = True
@@ -177,9 +194,7 @@ class Logger:
 
     def session_started(self, search_terms: list[str], location: str, **kwargs) -> None:
         """Log session start."""
-        self.info(
-            "Session started", search_terms=search_terms, location=location, **kwargs
-        )
+        self.info("Session started", search_terms=search_terms, location=location, **kwargs)
 
     def session_ended(self, stats: dict, **kwargs) -> None:
         """Log session end with statistics."""
@@ -231,9 +246,7 @@ def get_logger(name: str = "linkedin_applier") -> Logger:
 
 
 # Convenience function for backward compatibility
-def print_lg(
-    *msgs: Any, end: str = "\n", pretty: bool = False, flush: bool = False
-) -> None:
+def print_lg(*msgs: Any, end: str = "\n", pretty: bool = False, flush: bool = False) -> None:
     """
     Legacy logging function for backward compatibility.
     Maps to the new structured logger.
@@ -267,9 +280,7 @@ if __name__ == "__main__":
     log.job_skipped(job_id="67890", reason="Blacklisted company")
     log.job_failed(job_id="11111", error="Timeout waiting for element")
 
-    log.session_started(
-        search_terms=["Python Developer", "Software Engineer"], location="Remote"
-    )
+    log.session_started(search_terms=["Python Developer", "Software Engineer"], location="Remote")
 
     stats = {
         "jobs_applied": 10,

@@ -26,6 +26,7 @@ csv.field_size_limit(1000000)  # Set to 1MB instead of default 131KB
 
 from random import choice, shuffle, randint
 from datetime import datetime
+from typing import Literal, Union
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
