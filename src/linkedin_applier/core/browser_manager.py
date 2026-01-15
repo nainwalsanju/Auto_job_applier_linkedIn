@@ -84,7 +84,7 @@ class BrowserManager:
                 f"Initializing browser... headless={self.headless}, stealth={self.stealth_mode}, use_stealth_driver={use_stealth}"
             )
 
-            # Configure Chrome options
+            # Configure Chrome options - use minimal, compatible options
             if use_stealth:
                 options = uc.ChromeOptions()
             else:
@@ -92,40 +92,27 @@ class BrowserManager:
 
                 options = Options()
 
+            # Basic options only - avoid problematic ones
             if self.headless:
                 options.add_argument("--headless")
 
-            # Stealth mode settings
-            if self.stealth_mode:
-                options.add_argument("--disable-blink-features=AutomationControlled")
-                # Remove problematic experimental option that's causing issues
-                # options.add_experimental_option("excludeSwitches", ["enable-automation"])
+            # Essential options for stability
+            options.add_argument("--no-sandbox")
+            options.add_argument("--disable-dev-shm-usage")
+            options.add_argument("--window-size=1920,1080")
 
-            # User data and profile
+            # User data and profile (only if specified)
             if self.user_data_dir:
                 options.add_argument(f"--user-data-dir={self.user_data_dir}")
             if self.profile_dir:
                 options.add_argument(f"--profile-directory={self.profile_dir}")
 
-            # Common settings - use compatible options
-            options.add_argument("--no-sandbox")
-            options.add_argument("--disable-dev-shm-usage")
-            options.add_argument("--disable-gpu")
-            options.add_argument("--disable-extensions")
-            options.add_argument("--disable-plugins")
-            options.add_argument("--window-size=1920,1080")
-            options.add_argument("--disable-web-security")
-            options.add_argument("--allow-running-insecure-content")
-
-            # Additional stealth options
-            if self.stealth_mode:
-                options.add_argument("--disable-extensions-file-access-check")
-                options.add_argument("--disable-extensions-http-throttling")
-                options.add_argument("--disable-ipc-flooding-protection")
-                options.add_argument("--disable-renderer-backgrounding")
-                options.add_argument("--disable-background-timer-throttling")
-                options.add_argument("--disable-backgrounding-occluded-windows")
-                options.add_argument("--disable-features=VizDisplayCompositor")
+            # Minimal stealth options - avoid aggressive ones that cause crashes
+            if self.stealth_mode and use_stealth:
+                # Very basic stealth - remove automation indicators
+                options.add_argument("--disable-blink-features=AutomationControlled")
+                # Remove the webdriver property
+                options.add_experimental_option("useAutomationExtension", False)
 
             # Initialize driver with better error handling
             if use_stealth:
