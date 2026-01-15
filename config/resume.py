@@ -1,4 +1,4 @@
-'''
+"""
 Author:     Sai Vignesh Golla
 LinkedIn:   https://www.linkedin.com/in/saivigneshgolla/
 
@@ -6,13 +6,13 @@ Copyright (C) 2024 Sai Vignesh Golla
 
 License:    GNU Affero General Public License
             https://www.gnu.org/licenses/agpl-3.0.en.html
-            
+
 GitHub:     https://github.com/GodsScion/Auto_job_applier_linkedIn
 
 version:    24.12.29.12.30
-'''
+"""
 
-from personals import *
+from config.personals import *
 import json
 
 ###################################################### CONFIGURE YOUR RESUME HERE ######################################################
@@ -21,23 +21,14 @@ import json
 # # Give an relative path of your default resume to be uploaded. If file in not found, will continue using your previously uploaded resume in LinkedIn.
 # default_resume_path = "all resumes/default/resume.pdf"      # (In Development)
 
-'''
+"""
 YOU DON'T HAVE TO EDIT THIS FILE, IF YOU ADDED YOUR DEFAULT RESUME.
-'''
+"""
 
 
 # resume_headline = json({
 #     "first_name": first_name,
 # })
-
-
-
-
-
-
-
-
-
 
 
 # # >>>>>>>>>>> RELATED SETTINGS <<<<<<<<<<<
@@ -61,13 +52,8 @@ YOU DON'T HAVE TO EDIT THIS FILE, IF YOU ADDED YOUR DEFAULT RESUME.
 # overwrite_previous_answers = False # True or False, Note: True or False are case-sensitive
 
 
-
-
-
-
-
 ############################################################################################################
-'''
+"""
 THANK YOU for using my tool 😊! Wishing you the best in your job hunt 🙌🏻!
 
 Sharing is caring! If you found this tool helpful, please share it with your peers 🥺. Your support keeps this project alive.
@@ -80,5 +66,5 @@ Your support, whether through donations big or small or simply spreading the wor
 
 Gratefully yours 🙏🏻,
 Sai Vignesh Golla
-'''
+"""
 ############################################################################################################

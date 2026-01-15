@@ -1,4 +1,4 @@
-'''
+"""
 Author:     Sai Vignesh Golla
 LinkedIn:   https://www.linkedin.com/in/saivigneshgolla/
 
@@ -6,84 +6,80 @@ Copyright (C) 2024 Sai Vignesh Golla
 
 License:    GNU Affero General Public License
             https://www.gnu.org/licenses/agpl-3.0.en.html
-            
+
 GitHub:     https://github.com/GodsScion/Auto_job_applier_linkedIn
 
-version:    24.12.3.10.30
-'''
-
+version:    25.01.15.01.00
+"""
 
 ###################################################### CONFIGURE YOUR TOOLS HERE ######################################################
 
+# ⚠️  WARNING: Credentials are now loaded from environment variables or .env file!
+# See .env.example for the list of environment variables.
+# For security reasons, do NOT hardcode credentials in this file.
 
-# Login Credentials for LinkedIn (Optional)
-username = "sanjaynainwal129@gmail.com"  # Enter your username in the quotes
-password = "B@NGB@ng12"        # Enter your password in the quotes
+# Legacy support: These variables are kept for backward compatibility.
+# They are now loaded from secure_config.py which reads from environment variables.
 
+# DO NOT EDIT THESE VALUES HERE - THEY ARE LOADED FROM ENVIRONMENT
+# Use a .env file or set environment variables instead.
 
-## Artificial Intelligence (Beta Not-Recommended)
-# Use AI
-use_AI = False                          # True or False, Note: True or False are case-sensitive
-'''
-Note: Set it as True only if you want to use AI, and If you either have a
-1. Local LLM model running on your local machine, with it's APIs exposed. Example softwares to achieve it are:
-    a. Ollama - https://ollama.com/
-    b. llama.cpp - https://github.com/ggerganov/llama.cpp
-    c. LM Studio - https://lmstudio.ai/ (Recommended)
-    d. Jan - https://jan.ai/
-2. OR you have a valid OpenAI API Key, and money to spare, and you don't mind spending it.
-CHECK THE OPENAI API PIRCES AT THEIR WEBSITE (https://openai.com/api/pricing/). 
-'''
+# LinkedIn Credentials - Use LINKEDIN_USERNAME and LINKEDIN_PASSWORD environment variables
+# Example: export LINKEDIN_USERNAME="your_email@example.com"
+#          export LINKEDIN_PASSWORD="your_password"
 
-##> ------ Yang Li : MARKYangL - Feature ------
-##> ------ Tim L : tulxoro - Refactor ------
-# Select AI Provider
-ai_provider = "deepseek"               # "openai", "deepseek", "gemini"
-'''
-Note: Select your AI provider.
-* "openai" - OpenAI API (GPT models) OR OpenAi-compatible APIs (like Ollama)
-* "deepseek" - DeepSeek API (DeepSeek models)
-* "gemini" - Google Gemini API (Gemini models)
-* For any other models, keep it as "openai" if it is compatible with OpenAI's api.
-'''
+# AI Configuration - Use environment variables:
+# USE_AI=true/false
+# AI_PROVIDER=openai/deepseek/gemini
+# LLM_API_URL=https://api...
+# LLM_API_KEY=your-api-key
+# LLM_MODEL=model-name
+# LLM_SPEC=openai/openai-like
+# STREAM_OUTPUT=true/false
 
+# Get credentials from secure configuration (environment variables)
+from config.secure_config import (
+    get_linkedin_username,
+    get_linkedin_password,
+    get_ai_config,
+    use_ai,
+    get_ai_provider,
+    get_llm_api_key,
+)
 
+# Backward compatibility - these will load from environment
+username = get_linkedin_username()
+password = get_linkedin_password()
+use_AI = use_ai()
+ai_provider = get_ai_provider()
 
-# Your LLM url or other AI api url and port
-#llm_api_url = ""       # Examples: "https://api.openai.com/v1/", "http://127.0.0.1:1234/v1/", "http://localhost:1234/v1/", "https://api.deepseek.com", "https://api.deepseek.com/v1"
-llm_api_url = "https://api.deepseek.com/v1"       # Examples: "https://api.openai.com/v1/", "http://127.0.0.1:1234/v1/", "http://localhost:1234/v1/", "https://api.deepseek.com", "https://api.deepseek.com/v1"
+# AI Configuration - loaded from secure_config (environment variables)
+ai_config = get_ai_config()
 
-'''
-Note: Don't forget to add / at the end of your url. You may not need this if you are using Gemini.
-'''
+# For backward compatibility with existing code
+llm_api_url = ai_config.llm_api_url
+llm_api_key = get_llm_api_key()
+llm_model = ai_config.llm_model
+llm_spec = ai_config.llm_spec
+stream_output = ai_config.stream_output
 
-# Your LLM API key or other AI API key
-llm_api_key = "sk-c101c45ee7af44c19e77e9ff43f59bd9"              # Enter your API key in the quotes, make sure it's valid, if not will result in error.
-'''
-Note: Leave it empty as "" or "not-needed" if not needed. Else will result in error!
-If you are using ollama, you MUST put "not-needed".
-'''
-
-# Your LLM model name or other AI model name
-llm_model = "deepseek-chat"          # Examples: "gpt-3.5-turbo", "gpt-4o", "llama-3.2-3b-instruct", "qwen3:latest", "gemini-pro", "gemini-1.5-flash", "gemini-2.5-flash", "deepseek-llm:latest"
-
-llm_spec = "openai"                # Examples: "openai", "openai-like", "openai-like-github", "openai-like-mistral"
-'''
-Note: Currently "openai" and "openai-like" api endpoints are supported.
-'''
-
-# # Yor local embedding model name or other AI Embedding model name
-# llm_embedding_model = "nomic-embed-text-v1.5"
-
-# Do you want to stream AI output?
-stream_output = False                    # Examples: True or False. (False is recommended for performance, True is recommended for user experience!)
-'''
-Set `stream_output = True` if you want to stream AI output or `stream_output = False` if not.
-'''
-##
+# ============================================================================
+# DEPRECATION NOTICE
+# ============================================================================
+# The following variables are DEPRECATED and will be removed in a future version.
+# Please migrate to using config.secure_config or environment variables.
+#
+# Old usage:
+#   from config.secrets import username, password, llm_api_key
+#
+# New usage:
+#   from config.secure_config import get_linkedin_credentials, get_llm_api_key
+#   username, password = get_linkedin_credentials()
+#   api_key = get_llm_api_key()
+# ============================================================================
 
 ############################################################################################################
-'''
+"""
 THANK YOU for using my tool 😊! Wishing you the best in your job hunt 🙌🏻!
 
 Sharing is caring! If you found this tool helpful, please share it with your peers 🥺. Your support keeps this project alive.
@@ -96,5 +92,5 @@ Your support, whether through donations big or small or simply spreading the wor
 
 Gratefully yours 🙏🏻,
 Sai Vignesh Golla
-'''
+"""
 ############################################################################################################

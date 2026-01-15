@@ -1,13 +1,44 @@
 __pycache__
 .vscode
+.idea
 
-all excels
-all resumes
-logs
-
-old
-
+# Sensitive files
+.env
+.env.local
+.env.*.local
 secrets.py
 config/personals.py
-.venv
 apikeys.py
+
+# Application data
+all excels/
+all resumes/
+logs/
+results/
+
+# Python virtual environment
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build
+dist/
+build/
+*.egg-info/
+
+# Old directory
+old/
