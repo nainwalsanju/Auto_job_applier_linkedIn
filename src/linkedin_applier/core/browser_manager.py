@@ -50,6 +50,7 @@ class BrowserManager:
         self.profile_dir = profile_dir
         self.driver = None
         self.wait = None
+        self.actions = None
         self._initialized = False
 
     def initialize(self):
@@ -63,23 +64,42 @@ class BrowserManager:
             return
 
         try:
-            import undetected_chromedriver as uc
+            try:
+                import undetected_chromedriver as uc
+
+                use_stealth = True
+            except ImportError:
+                print("undetected-chromedriver not available, falling back to regular Chrome")
+                from selenium import webdriver
+
+                uc = None
+                use_stealth = False
+
             from selenium.webdriver.common.by import By
             from selenium.webdriver.support.ui import WebDriverWait
             from selenium.webdriver.support import expected_conditions as EC
+            from selenium.webdriver.common.action_chains import ActionChains
 
-            print(f"Initializing browser... headless={self.headless}, stealth={self.stealth_mode}")
+            print(
+                f"Initializing browser... headless={self.headless}, stealth={self.stealth_mode}, use_stealth_driver={use_stealth}"
+            )
 
             # Configure Chrome options
-            options = uc.ChromeOptions()
+            if use_stealth:
+                options = uc.ChromeOptions()
+            else:
+                from selenium.webdriver.chrome.options import Options
+
+                options = Options()
 
             if self.headless:
-                options.add_argument("--headless=new")
+                options.add_argument("--headless")
 
             # Stealth mode settings
             if self.stealth_mode:
                 options.add_argument("--disable-blink-features=AutomationControlled")
-                options.add_experimental_option("excludeSwitches", ["enable-automation"])
+                # Remove problematic experimental option that's causing issues
+                # options.add_experimental_option("excludeSwitches", ["enable-automation"])
 
             # User data and profile
             if self.user_data_dir:
@@ -87,20 +107,93 @@ class BrowserManager:
             if self.profile_dir:
                 options.add_argument(f"--profile-directory={self.profile_dir}")
 
-            # Common settings
+            # Common settings - use compatible options
             options.add_argument("--no-sandbox")
             options.add_argument("--disable-dev-shm-usage")
             options.add_argument("--disable-gpu")
+            options.add_argument("--disable-extensions")
+            options.add_argument("--disable-plugins")
             options.add_argument("--window-size=1920,1080")
+            options.add_argument("--disable-web-security")
+            options.add_argument("--allow-running-insecure-content")
 
-            # Initialize driver
-            self.driver = uc.Chrome(options=options, version_main=None)
+            # Additional stealth options
+            if self.stealth_mode:
+                options.add_argument("--disable-extensions-file-access-check")
+                options.add_argument("--disable-extensions-http-throttling")
+                options.add_argument("--disable-ipc-flooding-protection")
+                options.add_argument("--disable-renderer-backgrounding")
+                options.add_argument("--disable-background-timer-throttling")
+                options.add_argument("--disable-backgrounding-occluded-windows")
+                options.add_argument("--disable-features=VizDisplayCompositor")
 
-            # Set implicit wait
-            self.driver.implicitly_wait(settings.implicit_wait)
+            # Initialize driver with better error handling
+            if use_stealth:
+                try:
+                    # Try with automatic version detection first
+                    self.driver = uc.Chrome(options=options)
+                except Exception as e:
+                    print(f"Failed with automatic version detection: {e}")
+                    # Fallback to manual version detection
+                    try:
+                        self.driver = uc.Chrome(options=options, version_main=None)
+                    except Exception as e2:
+                        print(f"Failed with manual version detection: {e2}")
+                        # Last resort: try without version specification
+                        try:
+                            # Create options without problematic settings
+                            simple_options = uc.ChromeOptions()
+                            simple_options.add_argument("--no-sandbox")
+                            simple_options.add_argument("--disable-dev-shm-usage")
+                            if self.headless:
+                                simple_options.add_argument("--headless")
+                            simple_options.add_argument("--window-size=1920,1080")
+                            self.driver = uc.Chrome(options=simple_options)
+                            print("Browser initialized with minimal options")
+                        except Exception as e3:
+                            print(f"All browser initialization attempts failed: {e3}")
+                            raise
+            else:
+                # Use regular selenium webdriver
+                try:
+                    from selenium.webdriver.chrome.service import Service
+                    from webdriver_manager.chrome import ChromeDriverManager
 
-            # Create explicit wait
-            self.wait = WebDriverWait(self.driver, settings.explicit_wait)
+                    # Try to use webdriver-manager for automatic chromedriver management
+                    try:
+                        service = Service(ChromeDriverManager().install())
+                        self.driver = webdriver.Chrome(service=service, options=options)
+                        print("Browser initialized with webdriver-manager")
+                    except ImportError:
+                        # webdriver-manager not available, try direct path
+                        self.driver = webdriver.Chrome(options=options)
+                        print("Browser initialized with direct chromedriver")
+                except Exception as e:
+                    print(f"Regular Chrome driver failed: {e}")
+                    # Try with minimal options
+                    try:
+                        minimal_options = Options()
+                        minimal_options.add_argument("--no-sandbox")
+                        minimal_options.add_argument("--disable-dev-shm-usage")
+                        if self.headless:
+                            minimal_options.add_argument("--headless")
+                        minimal_options.add_argument("--window-size=1920,1080")
+                        self.driver = webdriver.Chrome(options=minimal_options)
+                        print("Browser initialized with minimal options (regular driver)")
+                    except Exception as e2:
+                        print(f"All driver initialization attempts failed: {e2}")
+                        raise
+
+            # Set implicit wait (default 10 seconds)
+            implicit_wait = getattr(settings, "implicit_wait", 10)
+            self.driver.implicitly_wait(implicit_wait)
+
+            # Create explicit wait (default 30 seconds)
+            explicit_wait = getattr(settings, "explicit_wait", 30)
+            self.wait = WebDriverWait(self.driver, explicit_wait)
+
+            # Create actions chain
+            self.actions = ActionChains(self.driver)
 
             # Remove webdriver property for stealth
             if self.stealth_mode:
