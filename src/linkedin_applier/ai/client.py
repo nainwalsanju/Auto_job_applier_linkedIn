@@ -13,7 +13,7 @@ Usage:
 
 import sys
 from pathlib import Path
-from typing import Optional, Dict, List, Any
+from typing import Optional, Dict, List, Any, Union
 from dataclasses import dataclass
 from enum import Enum
 
@@ -53,7 +53,12 @@ class AIClient:
         client: Actual provider client
     """
 
-    def __init__(self, provider: str = None, api_key: str = None, model: str = None):
+    def __init__(
+        self,
+        provider: Optional[str] = None,
+        api_key: Optional[str] = None,
+        model: Optional[str] = None,
+    ):
         """
         Initialize the AI client.
 
@@ -160,9 +165,9 @@ class AIClient:
         question: str,
         options: Optional[List[str]] = None,
         question_type: str = "text",
-        job_description: str = None,
-        about_company: str = None,
-        user_info: str = None,
+        job_description: Optional[str] = None,
+        about_company: Optional[str] = None,
+        user_info: Optional[str] = None,
     ) -> str:
         """
         Generate answer for a question using AI.
@@ -249,7 +254,7 @@ class AIClient:
         return self.client is not None
 
 
-def create_ai_client(provider: str = None) -> AIClient:
+def create_ai_client(provider: Optional[str] = None) -> AIClient:
     """
     Factory function to create an AI client.
 

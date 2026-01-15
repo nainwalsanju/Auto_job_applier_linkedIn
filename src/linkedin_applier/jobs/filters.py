@@ -307,8 +307,8 @@ class JobFilter:
                     success = False
 
             # Apply work style filter
-            if hasattr(search_config, "work_style") and search_config.work_style:
-                if not self.set_work_style_filter(search_config.work_style):
+            if hasattr(search_config, "on_site") and search_config.on_site:
+                if not self.set_work_style_filter(search_config.on_site):
                     success = False
 
             # Apply company filter

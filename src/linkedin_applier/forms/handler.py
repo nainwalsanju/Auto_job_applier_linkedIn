@@ -13,7 +13,7 @@ Usage:
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any, Callable
 
 # Add project root to path for config imports
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -53,7 +53,7 @@ class FormHandler:
         self.parser = FormParser(driver, wait)
 
     def fill_form(
-        self, answers: Optional[Dict[str, str]] = None, ai_answerer: Optional[callable] = None
+        self, answers: Optional[Dict[str, str]] = None, ai_answerer: Optional[Callable] = None
     ) -> List[Dict[str, str]]:
         """
         Fill out the current form with answers.
@@ -228,7 +228,7 @@ class FormHandler:
             log.warning(f"Failed to fill field '{field.label}': {e}")
             return False
 
-    def _find_input_element(self, field: FormField) -> Optional:
+    def _find_input_element(self, field: FormField) -> Optional[Any]:
         """Find the input element for a field."""
         try:
             # Try to find by label association

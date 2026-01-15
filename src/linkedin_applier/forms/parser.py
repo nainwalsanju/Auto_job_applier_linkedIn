@@ -12,7 +12,7 @@ Usage:
 
 import sys
 from pathlib import Path
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Any
 
 # Add project root to path for config imports
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -124,7 +124,7 @@ class FormParser:
         log.info(f"Detected {len(fields)} form fields")
         return fields
 
-    def _find_form_sections(self) -> List:
+    def _find_form_sections(self) -> List[Any]:
         """Find all form sections/inputs."""
         try:
             # Look for form input containers
@@ -226,7 +226,7 @@ class FormParser:
         except Exception:
             return None
 
-    def _find_input(self, section):
+    def _find_input(self, section) -> Tuple[Optional[Any], Optional[str]]:
         """Find input element and its type."""
         try:
             # Check for different input types
