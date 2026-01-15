@@ -77,16 +77,28 @@ class BrowserManager:
 
             print(f"Initializing browser... headless={self.headless}, stealth={self.stealth_mode}")
 
-            # Configure Chrome options - minimal and stable
+            # Configure Chrome options - PERFORMANCE OPTIMIZED
             options = Options()
 
             if self.headless:
                 options.add_argument("--headless")
 
-            # Essential stable options only
+            # PERFORMANCE & STABILITY OPTIONS
             options.add_argument("--no-sandbox")
             options.add_argument("--disable-dev-shm-usage")
             options.add_argument("--window-size=1920,1080")
+            options.add_argument(
+                "--disable-extensions"
+            )  # CRITICAL: Disable extensions causing errors
+            options.add_argument("--disable-plugins")
+            options.add_argument("--disable-web-security")
+            options.add_argument("--disable-features=VizDisplayCompositor")
+            options.add_argument("--disable-ipc-flooding-protection")
+            options.add_argument("--disable-popup-blocking")
+            options.add_argument("--disable-background-timer-throttling")
+            options.add_argument("--disable-backgrounding-occluded-windows")
+            options.add_argument("--disable-renderer-backgrounding")
+            options.add_argument("--disable-component-extensions-with-background-pages")
 
             # User data and profile (only if specified)
             if self.user_data_dir:
@@ -94,7 +106,7 @@ class BrowserManager:
             if self.profile_dir:
                 options.add_argument(f"--profile-directory={self.profile_dir}")
 
-            # Basic stealth options (if requested)
+            # Minimal stealth options (if requested) - REDUCED for performance
             if self.stealth_mode:
                 options.add_argument("--disable-blink-features=AutomationControlled")
 
@@ -113,12 +125,12 @@ class BrowserManager:
                     print(f"System chromedriver failed: {e2}")
                     raise
 
-            # Set implicit wait (default 10 seconds)
-            implicit_wait = getattr(settings, "implicit_wait", 10)
+            # PERFORMANCE OPTIMIZATION: Reduced wait times for faster operation
+            implicit_wait = getattr(settings, "implicit_wait", 5)  # Reduced from 10 to 5
             self.driver.implicitly_wait(implicit_wait)
 
-            # Create explicit wait (default 30 seconds)
-            explicit_wait = getattr(settings, "explicit_wait", 30)
+            # Create explicit wait (default 15 seconds - reduced for performance)
+            explicit_wait = getattr(settings, "explicit_wait", 15)  # Reduced from 30 to 15
             self.wait = WebDriverWait(self.driver, explicit_wait)
 
             # Create actions chain

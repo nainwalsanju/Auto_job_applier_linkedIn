@@ -51,7 +51,7 @@ from modules.clickers_and_finders import *
 from modules.validator import validate_config
 
 # NEW: Refactored modules (with fallbacks to old code)
-USE_REFACTORED = False  # Set to False to disable refactored modules and use old code
+USE_REFACTORED = True  # Set to False to disable refactored modules and use old code
 
 if USE_REFACTORED:
     try:
@@ -75,8 +75,8 @@ if not REFACTORED_AVAILABLE:
     # Import original modules when not using refactored
     from modules.open_chrome import *
 
-# Import truncate_for_csv function (needed for CSV writing regardless of mode)
-from modules.helpers import truncate_for_csv
+# Import essential functions (needed regardless of mode)
+from modules.helpers import truncate_for_csv, calculate_date_posted
 
 # Import helpers conditionally to avoid conflicts
 if not REFACTORED_AVAILABLE:
@@ -302,25 +302,29 @@ def apply_filters() -> None:
     set_search_location()
 
     try:
-        recommended_wait = 1 if click_gap < 1 else 0
+        # PERFORMANCE OPTIMIZATION: Reduce buffer delays for faster filtering
+        fast_mode = True  # Enable fast mode to reduce delays
+        recommended_wait = 0 if fast_mode else (1 if click_gap < 1 else 0)
 
         wait.until(
             EC.presence_of_element_located((By.XPATH, '//button[normalize-space()="All filters"]'))
         ).click()
-        buffer(recommended_wait)
+        if not fast_mode:
+            buffer(recommended_wait)
 
         wait_span_click(driver, sort_by)
         wait_span_click(driver, date_posted)
-        buffer(recommended_wait)
+        if not fast_mode:
+            buffer(recommended_wait)
 
         multi_sel_noWait(driver, experience_level)
         multi_sel_noWait(driver, companies, actions)
-        if experience_level or companies:
+        if not fast_mode and (experience_level or companies):
             buffer(recommended_wait)
 
         multi_sel_noWait(driver, job_type)
         multi_sel_noWait(driver, on_site)
-        if job_type or on_site:
+        if not fast_mode and (job_type or on_site):
             buffer(recommended_wait)
 
         if easy_apply_only:
@@ -328,12 +332,12 @@ def apply_filters() -> None:
 
         multi_sel_noWait(driver, location)
         multi_sel_noWait(driver, industry)
-        if location or industry:
+        if not fast_mode and (location or industry):
             buffer(recommended_wait)
 
         multi_sel_noWait(driver, job_function)
         multi_sel_noWait(driver, job_titles)
-        if job_function or job_titles:
+        if not fast_mode and (job_function or job_titles):
             buffer(recommended_wait)
 
         if under_10_applicants:
@@ -344,7 +348,8 @@ def apply_filters() -> None:
             boolean_button_click(driver, actions, "Fair Chance Employer")
 
         wait_span_click(driver, salary)
-        buffer(recommended_wait)
+        if not fast_mode:
+            buffer(recommended_wait)
 
         multi_sel_noWait(driver, benefits)
         multi_sel_noWait(driver, commitments)
@@ -898,7 +903,7 @@ def answer_questions(
                 text.clear()
                 text.send_keys(answer)
                 if do_actions:
-                    sleep(2)
+                    sleep(0.5)  # PERFORMANCE OPTIMIZATION: Reduced from sleep(2) to sleep(0.5)
                     actions.send_keys(Keys.ARROW_DOWN)
                     actions.send_keys(Keys.ENTER).perform()
             questions_list.add((label, text.get_attribute("value"), "text", prev_answer))
@@ -968,7 +973,7 @@ def answer_questions(
             text_area.clear()
             text_area.send_keys(answer)
             if do_actions:
-                sleep(2)
+                sleep(0.5)  # PERFORMANCE OPTIMIZATION: Reduced from sleep(2) to sleep(0.5)
                 actions.send_keys(Keys.ARROW_DOWN)
                 actions.send_keys(Keys.ENTER).perform()
             questions_list.add((label, text_area.get_attribute("value"), "textarea", prev_answer))
@@ -1274,8 +1279,8 @@ def apply_to_jobs(search_terms: list[str]) -> None:
 
                 pagination_element, current_page = get_page_info()
 
-                # Find all job listings in current page
-                buffer(3)
+                # Find all job listings in current page (PERFORMANCE OPTIMIZATION: Minimal buffer delay)
+                buffer(0)  # PERFORMANCE: No artificial delay for maximum speed
                 job_listings = driver.find_elements(By.XPATH, "//li[@data-occludable-job-id]")
 
                 for job in job_listings:
