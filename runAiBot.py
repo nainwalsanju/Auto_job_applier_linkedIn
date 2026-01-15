@@ -46,32 +46,8 @@ from config.search import *
 from config.secrets import use_AI, username, password, ai_provider
 from config.settings import *
 
-from modules.open_chrome import *
 from modules.clickers_and_finders import *
 from modules.validator import validate_config
-
-# Import helpers conditionally to avoid conflicts - moved after REFACTORED_AVAILABLE is defined
-
-
-from modules.ai.openaiConnections import (
-    ai_create_openai_client,
-    ai_extract_skills,
-    ai_answer_question,
-    ai_close_openai_client,
-)
-from modules.ai.deepseekConnections import (
-    deepseek_create_client,
-    deepseek_extract_skills,
-    deepseek_answer_question,
-)
-from modules.ai.geminiConnections import (
-    gemini_create_client,
-    gemini_extract_skills,
-    gemini_answer_question,
-)
-
-from typing import Literal
-
 
 # NEW: Refactored modules (with fallbacks to old code)
 USE_REFACTORED = True  # Set to False to disable refactored modules and use old code
@@ -93,15 +69,24 @@ if USE_REFACTORED:
 else:
     REFACTORED_AVAILABLE = False
 
+# Import modules conditionally to prevent double browser initialization
+if not REFACTORED_AVAILABLE:
+    # Import original modules when not using refactored
+    from modules.open_chrome import *
+
+# Import truncate_for_csv function (needed for CSV writing regardless of mode)
+from modules.helpers import truncate_for_csv
+
+# Import helpers conditionally to avoid conflicts
+if not REFACTORED_AVAILABLE:
+    from modules.helpers import *
+
+
 # Initialize global variables for refactored components
 browser_mgr = None
 session_mgr = None
 app_state = None
 ai_client = None
-
-# Import helpers conditionally to avoid conflicts
-if not REFACTORED_AVAILABLE:
-    from modules.helpers import *
 
 
 # Create unified logging function
@@ -1080,7 +1065,7 @@ def external_apply(
         return True, application_link, tabs_count
 
 
-def follow_company(modal: WebDriver = driver) -> None:
+def follow_company(modal: WebDriver) -> None:
     """
     Function to follow or un-follow easy applied companies based om `follow_companies`
     """
@@ -1877,8 +1862,12 @@ def main() -> None:
                 print_lg("Failed to close AI client:", e)
         ##<
         try:
-            if driver:
+            if REFACTORED_AVAILABLE and browser_mgr:
+                browser_mgr.close()
+                print_lg("Browser closed via refactored manager.")
+            elif driver:
                 driver.quit()
+                print_lg("Browser closed via original driver.")
         except WebDriverException as e:
             print_lg("Browser already closed.", e)
         except Exception as e:
