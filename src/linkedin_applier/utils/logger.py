@@ -68,30 +68,59 @@ class Logger:
         self.log_file = log_dir / f"applier_{timestamp}.log"
 
         if STRUCTLOG_AVAILABLE:
+            # PHASE 2: Lightweight processors for performance (removed heavy ones)
             processors = [
                 structlog.processors.add_log_level,
-                structlog.processors.TimeStamper(fmt="iso"),
-                structlog.processors.StackInfoRenderer(),
-                structlog.processors.format_exc_info,
-                structlog.processors.UnicodeDecoder(),
+                # Simplified timestamp (removed ISO format complexity)
+                structlog.processors.TimeStamper(fmt="%H:%M:%S", key="time"),
             ]
 
             if json_format:
                 processors.append(structlog.processors.JSONRenderer())
             elif console_output:
-                processors.append(structlog.dev.ConsoleRenderer())
+                # Disabled colors for speed
+                processors.append(structlog.dev.ConsoleRenderer(colors=False))
 
-            # Add file writer
-            def write_to_file(logger, method_name, event_dict):
-                if self.log_file and event_dict:
+            # PHASE 3: Async buffered file writer (replaces blocking write_to_file)
+            import threading
+            import queue
+
+            self._log_queue = queue.Queue()
+            self._stop_event = threading.Event()
+
+            def async_file_writer():
+                """Background thread for buffered file writing."""
+                buffer = []
+                while not self._stop_event.is_set() or not self._log_queue.empty():
                     try:
-                        with open(self.log_file, "a", encoding="utf-8") as f:
-                            f.write(str(event_dict) + "\n")
-                    except Exception:
+                        # Collect logs in buffer
+                        while len(buffer) < 10 and not self._log_queue.empty():
+                            log_entry = self._log_queue.get(timeout=0.1)
+                            if log_entry:
+                                buffer.append(log_entry)
+
+                        # Batch write to file
+                        if buffer and self.log_file:
+                            try:
+                                with open(self.log_file, "a", encoding="utf-8") as f:
+                                    f.write("\n".join(buffer) + "\n")
+                                buffer.clear()
+                            except Exception:
+                                pass
+                    except:
                         pass
+
+            # Start background writer thread
+            self._writer_thread = threading.Thread(target=async_file_writer, daemon=True)
+            self._writer_thread.start()
+
+            def write_to_file_async(logger, method_name, event_dict):
+                """Async file writer - queues logs instead of blocking."""
+                if self.log_file and event_dict:
+                    self._log_queue.put(str(event_dict))
                 return event_dict
 
-            processors.append(write_to_file)
+            processors.append(write_to_file_async)
 
             # Use standard logging levels since structlog doesn't have them
             import logging
@@ -125,6 +154,13 @@ class Logger:
                 )
 
         self.logger = structlog.get_logger(self.name) if STRUCTLOG_AVAILABLE else None
+
+    def close(self):
+        """Clean shutdown - flush logs and stop background thread."""
+        if hasattr(self, "_stop_event"):
+            self._stop_event.set()
+        if hasattr(self, "_writer_thread") and self._writer_thread.is_alive():
+            self._writer_thread.join(timeout=1.0)
         self._initialized = True
 
     def _log(self, level: str, message: str, **kwargs) -> None:

@@ -51,7 +51,7 @@ from modules.clickers_and_finders import *
 from modules.validator import validate_config
 
 # NEW: Refactored modules (with fallbacks to old code)
-USE_REFACTORED = True  # Set to False to disable refactored modules and use old code
+USE_REFACTORED = False  # Set to False to disable refactored modules and use old code
 
 if USE_REFACTORED:
     try:
@@ -83,29 +83,34 @@ if not REFACTORED_AVAILABLE:
     from modules.helpers import *
 
 
-# Initialize global variables for refactored components
-browser_mgr = None
-session_mgr = None
-app_state = None
-ai_client = None
+# PHASE 1: Cache logger import to avoid repeated imports (Performance Optimization)
+_structured_log = None
+if REFACTORED_AVAILABLE:
+    try:
+        from src.linkedin_applier.utils.logger import Logger
+
+        _structured_log = Logger("linkedin_applier")
+        # Setup with performance optimizations enabled
+        from pathlib import Path
+
+        _structured_log.setup(
+            log_dir=Path("logs"), log_level="INFO", json_format=False, console_output=True
+        )
+    except ImportError:
+        _structured_log = None
+        REFACTORED_AVAILABLE = False
 
 
-# Create unified logging function
+# Create unified logging function (Optimized)
 def print_lg(*args, **kwargs):
-    if REFACTORED_AVAILABLE:
-        # Convert old-style logging to new structured logging
+    if REFACTORED_AVAILABLE and _structured_log:
+        # Use cached logger import - FAST
         if len(args) == 1:
-            from src.linkedin_applier.utils.logger import log
-
-            log.info(args[0])
+            _structured_log.info(args[0])
         elif len(args) == 2:
-            from src.linkedin_applier.utils.logger import log
-
-            log.info(args[0], extra=args[1])
+            _structured_log.info(args[0], extra=args[1])
         else:
-            from src.linkedin_applier.utils.logger import log
-
-            log.info(str(args))
+            _structured_log.info(str(args))
     else:
         # Use original print_lg from helpers
         from modules.helpers import print_lg as original_print_lg
@@ -113,12 +118,10 @@ def print_lg(*args, **kwargs):
         original_print_lg(*args, **kwargs)
 
 
-# Create unified error logging function
+# Create unified error logging function (Optimized)
 def critical_error_log(possible_reason: str, stack_trace):
-    if REFACTORED_AVAILABLE:
-        from src.linkedin_applier.utils.logger import log
-
-        log.critical(possible_reason, error=str(stack_trace) if stack_trace else None)
+    if REFACTORED_AVAILABLE and _structured_log:
+        _structured_log.critical(possible_reason, error=str(stack_trace) if stack_trace else None)
     else:
         from modules.helpers import critical_error_log as original_critical_error_log
 
@@ -1712,7 +1715,6 @@ def main() -> None:
 
         # NEW: Initialize refactored components if available
         if REFACTORED_AVAILABLE:
-            setup_logging(log_dir="logs")
             global browser_mgr, session_mgr, app_state, ai_client
             browser_mgr = BrowserManager(headless=False, stealth_mode=True)
             browser_mgr.initialize()
@@ -1873,6 +1875,13 @@ def main() -> None:
             print_lg("Browser already closed.", e)
         except Exception as e:
             critical_error_log("When quitting...", e)
+
+        # Cleanup logger (flush any pending logs)
+        if REFACTORED_AVAILABLE and _structured_log:
+            try:
+                _structured_log.close()
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":
