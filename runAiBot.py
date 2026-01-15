@@ -449,7 +449,7 @@ def get_job_main_details(
         # print_lg(e)
         discard_job()
         job_details_button.click()  # To pass the error outside
-    buffer(click_gap)
+    buffer(0)  # PERFORMANCE OPTIMIZATION: Reduced delay after job details click
     return (job_id, title, company, work_location, work_style, skip)
 
 
@@ -482,7 +482,7 @@ def check_blacklist(
                 rejected_jobs.add(job_id)
                 blacklisted_companies.add(company)
                 raise ValueError(f'\n"{about_company_org}"\n\nContains "{word}".')
-    buffer(click_gap)
+    buffer(0)  # PERFORMANCE OPTIMIZATION: Reduced delay after blacklist check
     scroll_to_view(driver, jobs_top_card)
     return rejected_jobs, blacklisted_companies, jobs_top_card
 
@@ -1486,7 +1486,8 @@ def apply_to_jobs(search_terms: list[str]) -> None:
                                         next_button.click()
                                     except ElementClickInterceptedException:
                                         break  # Happens when it tries to click Next button in About Company photos section
-                                    buffer(click_gap)
+                                    # PERFORMANCE OPTIMIZATION: Skip buffer delay for faster form navigation
+                                    buffer(0)  # Changed from buffer(click_gap) to eliminate delay
 
                             except NoSuchElementException:
                                 errored = "nose"
