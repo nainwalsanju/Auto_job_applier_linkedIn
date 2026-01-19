@@ -17,7 +17,10 @@ version:    24.12.29.12.30
 import os
 import csv
 import re
+import time
+
 import pyautogui
+import threading
 
 # Set CSV field size limit to prevent field size errors
 csv.field_size_limit(1000000)  # Set to 1MB instead of default 131KB
@@ -177,9 +180,14 @@ def set_search_location() -> None:
     '''
     if search_location.strip():
         try:
-            print_lg(f'Setting search location as: "{search_location.strip()}"')
+            #create an array of locations by splitting with comma and then pick one randomly if randomize_search_location is True
+            locations = [loc.strip() for loc in search_location.split(',') if loc.strip()]
+            final_location = choice(locations) if randomize_search_location else locations[0]
+
+
+            print_lg(f'Setting search location as: "{final_location.strip()}"')
             search_location_ele = try_xp(driver, ".//input[@aria-label='City, state, or zip code'and not(@disabled)]", False) #  and not(@aria-hidden='true')]")
-            text_input(actions, search_location_ele, search_location, "Search Location")
+            text_input(actions, search_location_ele, final_location, "Search Location")
         except ElementNotInteractableException:
             try_xp(driver, ".//label[@class='jobs-search-box__input-icon jobs-search-box__keywords-label']")
             actions.send_keys(Keys.TAB, Keys.TAB).perform()
@@ -1035,7 +1043,49 @@ def apply_to_jobs(search_terms: list[str]) -> None:
                                     if decision == "Discard Application": raise Exception("Job application discarded by user!")
                                     pause_before_submit = False if "Disable Pause" == decision else True
                                     # try_xp(modal, ".//span[normalize-space(.)='Review']")
+                                # if errored != "stuck" and cur_pause_before_submit:
+                                #     # function to try auto-clicking Submit after timeout
+                                #     def _auto_click_submit():
+                                #         try:
+                                #             # Try to click the Submit application button (non-blocking)
+                                #             # If it succeeds, the later normal flow will pick up the Done button
+                                #             if wait_span_click(driver, "Submit application", 2, scrollTop=True):
+                                #                 date_applied = datetime.now()
+                                #                 if not wait_span_click(driver, "Done", 2): actions.send_keys(
+                                #                     Keys.ESCAPE).perform()
+                                #         except Exception:
+                                #             # ignore failures here — main flow handles them
+                                #             pass
+                                #
+                                #     # Start the 5 second timer that will auto-click if user does nothing
+                                #     auto_timer = threading.Timer(5.0, _auto_click_submit)
+                                #     auto_timer.daemon = True
+                                #     auto_timer.start()
+                                #
+                                #     # Show the confirm dialog to let the user inspect/edit.
+                                #     # If the user responds here within 5 seconds, we'll cancel the auto timer.
+                                #     decision = pyautogui.confirm(
+                                #         '1. Please verify your information.\n'
+                                #         '2. If you edited something, please return to this final screen.\n'
+                                #         '3. DO NOT CLICK "Submit Application".\n\n\n\n\n'
+                                #         'You can turn off "Pause before submit" setting in config.py\n'
+                                #         'To TEMPORARILY disable pausing, click "Disable Pause"',
+                                #         "Confirm your information",
+                                #         ["Disable Pause", "Discard Application", "Submit Application"]
+                                #     )
+                                #
+                                #     # User responded — cancel the auto submit if still pending
+                                #     try:
+                                #         auto_timer.cancel()
+                                #     except Exception:
+                                #         pass
+                                #
+                                #     if decision == "Discard Application":
+                                #         raise Exception("Job application discarded by user!")
+                                #     pause_before_submit = False if decision == "Disable Pause" else True
                                 follow_company(modal)
+                                time.sleep(10)
+
                                 if wait_span_click(driver, "Submit application", 2, scrollTop=True): 
                                     date_applied = datetime.now()
                                     if not wait_span_click(driver, "Done", 2): actions.send_keys(Keys.ESCAPE).perform()
