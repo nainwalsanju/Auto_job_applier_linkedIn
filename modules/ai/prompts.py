@@ -123,7 +123,71 @@ Respond concisely based on the type of question:
 **User Information:** 
 {}
 
-**QUESTION Strat from here:**  
+**QUESTION Strat from here:**
 {}
+"""
+#<
+
+##> Generate Complete Personalized Message
+
+# Structure of messages = `[{"role": "user", "content": generate_complete_message_prompt}]`
+
+generate_complete_message_prompt = """
+You are an expert career counselor helping a professional craft personalized outreach messages to recruiters on LinkedIn. Your task is to generate a complete, professional message body for contacting a recruiter about a specific job opportunity.
+
+Analyze the provided information and create a compelling message that:
+1. Has a professional greeting
+2. Expresses genuine interest in the position and company
+3. Highlights relevant qualifications and experience that match the job requirements
+4. Shows specific knowledge of the role and company
+5. Proposes next steps for discussion
+6. Includes contact information
+7. Maintains a professional tone throughout
+8. Is concise but comprehensive (aim for 150-250 words)
+
+Use the job description to identify key requirements and tailor your response accordingly. Reference specific skills, technologies, or experiences from the candidate's background that align with the role.
+
+IMPORTANT: Return ONLY the complete message body text, no additional commentary or explanations. The message should be ready to use directly.
+
+RECRUITER INFORMATION:
+Name: {recruiter_name}
+Title: {recruiter_title}
+
+JOB INFORMATION:
+Title: {job_title}
+Company: {company_name}
+Description: {job_description}
+
+CANDIDATE INFORMATION:
+Name: {candidate_name}
+Years of Experience: {years_of_experience}
+Headline: {candidate_headline}
+Professional Summary: {candidate_summary}
+Key Skills: {candidate_skills}
+LinkedIn Profile: {linkedin_profile}
+Portfolio/Website: {portfolio_url}
+Phone: {phone_number}
+Resume Link: {resume_link}
+
+Job Link: {job_link}
+"""
+
+generate_complete_message_response_format = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "Complete_Message_Response",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "message_body": {"type": "string"}
+            },
+            "required": ["message_body"],
+            "additionalProperties": False
+        },
+    },
+}
+"""
+Response schema for `generate_complete_message` function
 """
 #<

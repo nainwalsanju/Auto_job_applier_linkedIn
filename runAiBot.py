@@ -1051,12 +1051,12 @@ def apply_to_jobs(search_terms: list[str]) -> None:
                                     track_sent_message(
                                         job_id, title, company, job_link,
                                         recruiter_info, "", "",
-                                        False, skip_reason, ""
+                                        False, skip_reason, "", ""
                                     )
                                 else:
                                     # Generate personalized message
                                     print_lg("✍️ Generating personalized message...")
-                                    subject, message_body = generate_personalized_message(
+                                    subject, message_body, template_name = generate_personalized_message(
                                         aiClient,
                                         recruiter_info,
                                         description,
@@ -1077,7 +1077,7 @@ def apply_to_jobs(search_terms: list[str]) -> None:
                                     track_sent_message(
                                         job_id, title, company, job_link,
                                         recruiter_info, subject, message_body,
-                                        success, "", error_msg
+                                        success, "", error_msg, template_name
                                     )
                                     
                                     if success:

@@ -204,7 +204,7 @@ Once your code is tested, your changes will be merged to the `main` branch in ne
 - Easy applies
 - Auto Answers questions answered in config
 - Collects urls of career page if have to Apply externally
-- Collects HR Info
+- Collects HR Info and sends personalized messages to recruiters who accept free messages
 - Collects skills required (In Development)
 - Collects experience required and skips if not applicable to you, must be configured
 - Auto Filters jobs based on your experience and black list key words
@@ -238,8 +238,7 @@ Once your code is tested, your changes will be merged to the `main` branch in ne
 
 #### Upcoming Features or currently in development 🤖🛠️:
 - Answer questions with help of chatGpt or other LLMs
-- Humanize clicks and mouse movements for stealth 
-- Auto send personalized messages to HR that accept messages
+- Humanize clicks and mouse movements for stealth
 - Custom resume generator based on Skills required gathering (In Development)
 - Customize resume for every job using LLMs ChatGPT (In Development). (Halted decision pending, will probably implement api or utilize other LLMs or Web Scrape)
 
@@ -290,6 +289,11 @@ With heartfelt appreciation, <br>
 <br>
 
 ## 🗓️ Major Updates History:
+### Jan 18, 2026
+- Implemented recruiter messaging feature - automatically sends personalized messages to recruiters accepting free messages
+- Added InMail detection to preserve premium credits
+- Enhanced messaging with AI-generated personalized content (when enabled)
+
 ### Jul 20, 2024
 - Contributions from community have been added
 - Better AI support, minor bug fixes
@@ -415,7 +419,7 @@ alternate link: https://discord.gg/ykfDjRFB
     - [Support Q&A](https://github.com/GodsScion/Auto_job_applier_linkedIn/discussions/categories/support-q-a)
 
 
-#### ℹ️ Version: 25.07.20.9.30 Community Alpha
+#### ℹ️ Version: 26.01.18.23.30 Community Alpha
 
 ---
 

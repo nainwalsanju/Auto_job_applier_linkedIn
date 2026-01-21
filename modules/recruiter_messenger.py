@@ -18,6 +18,8 @@ Contributor: Sanjay Nainwal (sanjaynainwal129@gmail.com) - Feature: Recruiter Me
 # Imports
 import csv
 import os
+import random
+import uuid
 from datetime import datetime
 from typing import Literal
 
@@ -30,8 +32,8 @@ from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 
 from config.recruiter_messaging import *
-from config.personals import first_name, last_name
-from config.questions import years_of_experience
+from config.personals import first_name, last_name, phone_number
+from config.questions import years_of_experience, headline, linkedIn, website
 from modules.helpers import print_lg, buffer, make_directories
 
 # Import AI functions conditionally
@@ -41,6 +43,62 @@ if use_ai_for_messages:
         from modules.ai.openaiConnections import ai_answer_question
         from modules.ai.deepseekConnections import deepseek_answer_question
         from modules.ai.geminiConnections import gemini_answer_question
+        from modules.ai.prompts import generate_complete_message_prompt
+
+
+def robust_find_element(driver_or_element: WebDriver | WebElement, selectors: list[tuple[By, str]], timeout: int = 10) -> WebElement:
+    """
+    Robustly find an element using multiple fallback selectors.
+
+    Args:
+        driver_or_element: WebDriver instance or WebElement to search within
+        selectors: List of (By, selector) tuples to try in order
+        timeout: Timeout for each attempt
+
+    Returns:
+        WebElement if found
+
+    Raises:
+        NoSuchElementException if none of the selectors work
+    """
+    for by, selector in selectors:
+        try:
+            element = WebDriverWait(driver_or_element, timeout).until(
+                EC.presence_of_element_located((by, selector))
+            )
+            print_lg(f"DEBUG: Found element with selector: {by}='{selector}'")
+            return element
+        except (NoSuchElementException, TimeoutException):
+            print_lg(f"DEBUG: Selector failed: {by}='{selector}', trying next...")
+            continue
+    raise NoSuchElementException(f"No element found with any of the provided selectors: {selectors}")
+
+
+def robust_find_elements(driver_or_element: WebDriver | WebElement, selectors: list[tuple[By, str]], timeout: int = 10) -> list[WebElement]:
+    """
+    Robustly find elements using multiple fallback selectors.
+
+    Args:
+        driver_or_element: WebDriver instance or WebElement to search within
+        selectors: List of (By, selector) tuples to try in order
+        timeout: Timeout for each attempt
+
+    Returns:
+        List of WebElements found with the first working selector
+    """
+    for by, selector in selectors:
+        try:
+            elements = WebDriverWait(driver_or_element, timeout).until(
+                lambda d: d.find_elements(by, selector)
+            )
+            if elements:
+                print_lg(f"DEBUG: Found {len(elements)} elements with selector: {by}='{selector}'")
+                return elements
+        except (NoSuchElementException, TimeoutException):
+            print_lg(f"DEBUG: Selector failed: {by}='{selector}', trying next...")
+            continue
+    print_lg(f"DEBUG: No elements found with any selector")
+    return []
 
 
 # Global variables
@@ -52,7 +110,7 @@ def find_recruiter_on_job_page(driver: WebDriver) -> dict | None:
     '''
     Detects recruiter information from the job posting page.
     Returns a dictionary with recruiter details or None if not found.
-    
+
     Returns:
     {
         'name': str,
@@ -65,18 +123,46 @@ def find_recruiter_on_job_page(driver: WebDriver) -> dict | None:
     '''
     try:
         print_lg("DEBUG: Starting recruiter search...")
-        
+
         # STEP 1: Find "Meet the hiring team" section
-        # Verified XPath: Look for h2 with specific class and text, then get parent div
+        hiring_team_header_selectors = [
+            (By.XPATH, "//h2[contains(@class, 'text-heading-medium') and contains(normalize-space(.), 'Meet the hiring team')]"),
+            (By.CSS_SELECTOR, "h2[class*='text-heading'][class*='medium']"),
+            (By.XPATH, "//h2[contains(text(), 'Meet the hiring team')]"),
+            (By.XPATH, "//h2[contains(text(), 'hiring team')]"),
+            (By.XPATH, "//h2[contains(@aria-label, 'hiring team')]"),
+            (By.XPATH, "//h3[contains(text(), 'Meet the hiring team')]"),
+            (By.CSS_SELECTOR, "h2[data-test-id*='hiring']"),
+            (By.XPATH, "//div[contains(@class, 'hiring-team')]//h2"),
+        ]
+
+        hiring_team_section_selectors = [
+            (By.XPATH, "./ancestor::div[contains(@class, 'job-details-people-who-can-help__section--two-pane')]"),
+            (By.XPATH, "./parent::div[contains(@class, 'artdeco-card')]"),
+            (By.XPATH, "./ancestor::div[contains(@class, 'card')]"),
+            (By.XPATH, "./parent::div"),
+        ]
+
         hiring_team_section = None
         try:
             print_lg("DEBUG: Looking for 'Meet the hiring team' header...")
-            hiring_team_header = driver.find_element(By.XPATH, 
-                "//h2[contains(@class, 'text-heading-medium') and contains(normalize-space(.), 'Meet the hiring team')]")
+            hiring_team_header = robust_find_element(driver, hiring_team_header_selectors)
             print_lg("DEBUG: Found header! Getting parent section...")
-            hiring_team_section = hiring_team_header.find_element(By.XPATH, 
-                "./parent::div[contains(@class, 'artdeco-card')]")
-            print_lg("DEBUG: ✅ Found 'Meet the hiring team' section")
+
+            # Try multiple selectors for the section
+            for by, selector in hiring_team_section_selectors:
+                try:
+                    hiring_team_section = hiring_team_header.find_element(by, selector)
+                    print_lg(f"DEBUG: ✅ Found 'Meet the hiring team' section with {by}='{selector}'")
+                    print_lg(f"DEBUG: Section contains {len(hiring_team_section.find_elements(By.TAG_NAME, 'a'))} links, {len(hiring_team_section.find_elements(By.TAG_NAME, 'span'))} spans, {len(hiring_team_section.find_elements(By.TAG_NAME, 'div'))} divs")
+                    break
+                except NoSuchElementException:
+                    continue
+
+            if not hiring_team_section:
+                print_lg("DEBUG: ❌ Could not find section container with any selector")
+                return None
+
         except NoSuchElementException:
             print_lg("DEBUG: ❌ No 'Meet the hiring team' section found on this job posting.")
             return None
@@ -84,15 +170,26 @@ def find_recruiter_on_job_page(driver: WebDriver) -> dict | None:
         if not hiring_team_section:
             print_lg("DEBUG: ❌ hiring_team_section is None")
             return None
-        
+
         recruiter_info = {}
-        
+
         # STEP 2: Find recruiter profile link
+        profile_link_selectors = [
+            (By.XPATH, ".//div[contains(@class, 'display-flex align-items-center mt4')]//a[contains(@href, '/in/')]"),
+            (By.XPATH, ".//a[contains(@href, '/in/')]"),
+            (By.CSS_SELECTOR, "a[href*='/in/']"),
+            (By.XPATH, ".//a[contains(@data-test-id, 'profile-link')]"),
+            (By.XPATH, ".//a[contains(@aria-label, 'profile')]"),
+            (By.XPATH, ".//a[@data-control-name='profile_link']"),
+            (By.CSS_SELECTOR, "a[data-control-name='profile_link']"),
+        ]
+
         try:
+            print_lg(f"DEBUG: STEP 2: Extracting profile link from {len(hiring_team_section.find_elements(By.XPATH, './/a'))} total links in section")
             print_lg("DEBUG: Looking for recruiter profile link...")
-            recruiter_link = hiring_team_section.find_element(By.XPATH, ".//a[contains(@href, '/in/')]")
+            recruiter_link = robust_find_element(hiring_team_section, profile_link_selectors)
             recruiter_info['profile_link'] = recruiter_link.get_attribute('href')
-            
+
             # Extract recruiter ID from profile link
             recruiter_id = recruiter_info['profile_link'].split('/in/')[-1].split('/')[0].split('?')[0]
             recruiter_info['recruiter_id'] = recruiter_id
@@ -100,23 +197,47 @@ def find_recruiter_on_job_page(driver: WebDriver) -> dict | None:
         except NoSuchElementException:
             print_lg("DEBUG: ❌ Could not find recruiter profile link")
             return None
-        
+
         # STEP 3: Find recruiter name
+        name_selectors = [
+            (By.XPATH, ".//div[contains(@class, 'display-flex align-items-center mt4')]//span"),
+            (By.XPATH, ".//span[contains(@class, 'jobs-poster__name')]"),
+            (By.CSS_SELECTOR, "span[class*='poster'][class*='name']"),
+            (By.XPATH, ".//span[contains(@data-test-id, 'name')]"),
+            (By.XPATH, ".//span[contains(@aria-label, 'name')]"),
+            (By.XPATH, ".//a[contains(@href, '/in/')]/span"),  # name inside profile link
+            (By.XPATH, ".//h3"),  # sometimes name is h3
+            (By.XPATH, ".//span[contains(@class, 'hirer-card__name')]"),
+            (By.CSS_SELECTOR, "span[class*='hirer-card'][class*='name']"),
+        ]
+
         try:
+            print_lg("DEBUG: STEP 3: Extracting recruiter name")
             print_lg("DEBUG: Looking for recruiter name...")
-            name_element = hiring_team_section.find_element(By.XPATH, 
-                ".//span[contains(@class, 'jobs-poster__name')]")
+            name_element = robust_find_element(hiring_team_section, name_selectors)
             recruiter_info['name'] = name_element.text.strip()
             print_lg(f"DEBUG: ✅ Found recruiter name: {recruiter_info['name']}")
         except NoSuchElementException:
             print_lg("DEBUG: ⚠️ Could not find recruiter name, using fallback")
             recruiter_info['name'] = "Unknown Recruiter"
-        
+
         # STEP 4: Find recruiter title
+        title_selectors = [
+            (By.XPATH, ".//div[contains(@class, 'display-flex align-items-center mt4')]//div[contains(@class, 'text-body-small')]"),
+            (By.XPATH, ".//div[contains(@class, 'linked-area')]//div[contains(@class, 'text-body-small')]"),
+            (By.CSS_SELECTOR, "div[class*='linked-area'] div[class*='text-body']"),
+            (By.XPATH, ".//div[contains(@data-test-id, 'title')]"),
+            (By.XPATH, ".//span[contains(@aria-label, 'title')]"),
+            (By.XPATH, ".//div[contains(@class, 'text-body-small')]"),
+            (By.XPATH, ".//div[contains(@class, 'subtitle')]"),
+            (By.XPATH, ".//div[contains(@class, 'hirer-card__subtitle')]"),
+            (By.CSS_SELECTOR, "div[class*='hirer-card'][class*='subtitle']"),
+        ]
+
         try:
+            print_lg("DEBUG: STEP 4: Extracting recruiter title")
             print_lg("DEBUG: Looking for recruiter title...")
-            title_element = hiring_team_section.find_element(By.XPATH,
-                ".//div[contains(@class, 'linked-area')]//div[contains(@class, 'text-body-small')]")
+            title_element = robust_find_element(hiring_team_section, title_selectors)
             recruiter_info['title'] = title_element.text.strip()
             print_lg(f"DEBUG: ✅ Found recruiter title: {recruiter_info['title']}")
         except NoSuchElementException:
@@ -132,6 +253,8 @@ def find_recruiter_on_job_page(driver: WebDriver) -> dict | None:
         print_lg(f"✅ Found recruiter: {recruiter_info['name']} ({recruiter_info['title']}) - "
                 f"Can Message: {recruiter_info['can_message']}, Free Message: {recruiter_info['is_free_message']}")
         
+        print_lg("DEBUG: Recruiter detection completed successfully")
+
         return recruiter_info
     
     except Exception as e:
@@ -144,7 +267,7 @@ def find_recruiter_on_job_page(driver: WebDriver) -> dict | None:
 def check_message_capability(driver: WebDriver, hiring_team_section: WebElement) -> dict:
     '''
     Checks if recruiter can be messaged and if it's free or requires InMail.
-    
+
     Returns:
     {
         'can_message': bool,
@@ -157,84 +280,164 @@ def check_message_capability(driver: WebDriver, hiring_team_section: WebElement)
         'is_free_message': False,
         'message_type': 'unavailable'
     }
-    
+
     try:
         print_lg("DEBUG: Checking for Message button...")
-        
+
         # STEP 1: Find Message button in entry-point div
+        message_button_selectors = [
+            (By.XPATH, ".//button[contains(normalize-space(.), 'Message') or contains(@aria-label, 'Message')]"),
+            (By.CSS_SELECTOR, "button[aria-label*='Message']"),
+            (By.XPATH, ".//button[contains(@data-test-id, 'message-button')]"),
+            (By.XPATH, ".//button[contains(@class, 'message')]"),
+            (By.XPATH, ".//button[contains(@title, 'Message')]"),
+            (By.XPATH, ".//button[@data-control-name='message']"),
+            (By.CSS_SELECTOR, "button[data-control-name='message']"),
+            (By.XPATH, ".//button[@data-control-name='message_from_profile']"),
+            (By.XPATH, ".//button[contains(@aria-label, 'Send message to')]"),
+            (By.XPATH, ".//button[contains(@data-tracking-control-name, 'message')]"),
+        ]
+
         message_button = None
         try:
             # DEBUG: Print all buttons found to see what's available
-            all_buttons = hiring_team_section.find_elements(By.TAG_NAME, "button")
+            all_buttons = robust_find_elements(hiring_team_section, [(By.TAG_NAME, "button")])
             print_lg(f"DEBUG: Found {len(all_buttons)} buttons in hiring section:")
             for i, btn in enumerate(all_buttons):
                 try:
                     txt = btn.text.strip()
                     cls = btn.get_attribute("class")
-                    print_lg(f"  Button {i}: Text='{txt}', Class='{cls}'")
+                    aria = btn.get_attribute("aria-label")
+                    print_lg(f"  Button {i}: Text='{txt}', Class='{cls}', Aria='{aria}'")
                 except:
                     pass
 
-            # Verified XPath - use normalize-space for text matching
-            # Also tried finding by aria-label just in case
-            message_button = hiring_team_section.find_element(By.XPATH,
-                ".//button[contains(normalize-space(.), 'Message') or contains(@aria-label, 'Message')]")
-            
+            message_button = robust_find_element(hiring_team_section, message_button_selectors)
+
             print_lg("DEBUG: ✅ Found Message button")
             result['can_message'] = True
         except NoSuchElementException:
-            print_lg("DEBUG: ❌ No message button found (checked 'Message' text and aria-label)")
+            print_lg("DEBUG: ❌ No message button found with any selector")
             return result
         
         if not result['can_message']:
             return result
-        
-        # STEP 2: Check connection degree (1st/2nd/3rd)
+
+        # STEP 2: Open message modal to check for InMail credits display
+        print_lg("DEBUG: Opening message modal to check for InMail credits...")
+        modal_opened = False
         try:
-            print_lg("DEBUG: Checking connection degree...")
-            connection_degree = hiring_team_section.find_element(By.XPATH,
-                ".//span[contains(@class, 'hirer-card__connection-degree')]")
-            degree_text = connection_degree.text.strip()
-            print_lg(f"DEBUG: Connection degree: {degree_text}")
-            
-            if '1st' in degree_text or '2nd' in degree_text:
+            # Click the message button
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", message_button)
+            buffer(1)
+            message_button.click()
+            modal_opened = True
+
+            # Wait for modal to load
+            WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'msg-form__contenteditable')]"))
+            )
+            buffer(1)
+
+            # Check for InMail credits in the modal
+            inmail_selectors = [
+                (By.XPATH, "//section[contains(@class, 'msg-inmail-credits-display')]"),
+                (By.XPATH, "//p[contains(text(), 'InMail credits')]"),
+                (By.XPATH, "//*[contains(text(), 'Use') and contains(text(), 'InMail credits')]"),
+                (By.CSS_SELECTOR, "section[class*='inmail-credits']"),
+                (By.XPATH, "//div[contains(@class, 'inmail')]"),
+                (By.XPATH, "//div[contains(@class, 'premium-upsell')]"),
+                (By.CSS_SELECTOR, "div[class*='premium-upsell']"),
+                (By.XPATH, "//span[contains(text(), 'Premium')]"),
+                (By.XPATH, "//div[contains(@class, 'msg-inmail-upsell')]"),
+                (By.XPATH, "//div[contains(@aria-label, 'InMail credits')]"),
+                (By.XPATH, "//button[contains(@aria-label, 'Buy InMail credits')]"),
+            ]
+
+            try:
+                inmail_element = robust_find_element(driver, inmail_selectors, timeout=5)
+                print_lg(f"DEBUG: InMail credits detected in modal: {inmail_element.text.strip()}")
+                result['is_free_message'] = False
+                result['message_type'] = 'inmail'
+                print_lg("DEBUG: ❌ Modal shows InMail credits - requires InMail")
+                return result
+            except NoSuchElementException:
+                print_lg("DEBUG: No InMail credits detected in modal - assuming free message")
                 result['is_free_message'] = True
-                result['message_type'] = 'connection'
-                print_lg(f"DEBUG: ✅ Recruiter is {degree_text} connection (FREE messaging)")
+                result['message_type'] = 'free'
                 return result
-            elif '3rd' in degree_text:
-                result['is_free_message'] = False
-                result['message_type'] = 'inmail'
-                print_lg(f"DEBUG: ❌ Recruiter is {degree_text} connection (INMAIL required)")
-                return result
-            else:
-                print_lg(f"DEBUG: Recruiter connection degree: {degree_text} (unknown, assuming INMAIL)")
-                result['is_free_message'] = False
-                result['message_type'] = 'inmail'
-                return result
-        except NoSuchElementException:
-            print_lg("DEBUG: ⚠️ Could not find connection degree")
-            result['is_free_message'] = False
-            result['message_type'] = 'inmail'
-        
-        # STEP 3: Check button classes for premium/inmail indicators
-        try:
-            button_classes = message_button.get_attribute('class')
-            print_lg(f"DEBUG: Button classes: {button_classes}")
-            
-            if 'premium' in button_classes.lower() or 'inmail' in button_classes.lower():
-                result['is_free_message'] = False
-                result['message_type'] = 'inmail'
-                print_lg("DEBUG: ❌ Button has premium/inmail class - requires InMail")
-                return result
+
         except Exception as e:
-            print_lg(f"DEBUG: Could not check button classes: {e}")
-        
-        # STEP 4: Default decision based on entry-point presence
-        # If button is in entry-point div and no premium indicators, assume free
-        result['is_free_message'] = True
-        result['message_type'] = 'free'
-        print_lg("DEBUG: ✅ Message button in entry-point div with no premium indicators - assuming FREE messaging")
+            print_lg(f"DEBUG: Error opening modal for check: {e}")
+            # Fallback to connection degree check
+            print_lg("DEBUG: Falling back to connection degree check...")
+
+            # STEP 3: Check connection degree (1st/2nd/3rd)
+            connection_degree_selectors = [
+                (By.XPATH, ".//span[contains(@class, 'hirer-card__connection-degree')]"),
+                (By.CSS_SELECTOR, "span[class*='connection-degree']"),
+                (By.XPATH, ".//span[contains(@aria-label, 'connection')]"),
+                (By.XPATH, ".//span[contains(text(), '1st') or contains(text(), '2nd') or contains(text(), '3rd')]"),
+                (By.XPATH, ".//div[contains(@class, 'connection')]//span"),
+                (By.XPATH, ".//span[contains(@class, 'degree-icon')]"),
+                (By.CSS_SELECTOR, "span[class*='degree']"),
+            ]
+
+            try:
+                print_lg("DEBUG: Checking connection degree...")
+                connection_degree = robust_find_element(hiring_team_section, connection_degree_selectors)
+                degree_text = connection_degree.text.strip()
+                print_lg(f"DEBUG: Connection degree: {degree_text}")
+
+                if '1st' in degree_text or '2nd' in degree_text:
+                    result['is_free_message'] = True
+                    result['message_type'] = 'connection'
+                    print_lg(f"DEBUG: ✅ Recruiter is {degree_text} connection (FREE messaging)")
+                    return result
+                elif '3rd' in degree_text:
+                    result['is_free_message'] = False
+                    result['message_type'] = 'inmail'
+                    print_lg(f"DEBUG: ❌ Recruiter is {degree_text} connection (INMAIL required)")
+                    return result
+                else:
+                    print_lg(f"DEBUG: Recruiter connection degree: {degree_text} (unknown, assuming INMAIL)")
+                    result['is_free_message'] = False
+                    result['message_type'] = 'inmail'
+                    return result
+            except NoSuchElementException:
+                print_lg("DEBUG: ⚠️ Could not find connection degree")
+                result['is_free_message'] = False
+                result['message_type'] = 'inmail'
+
+            # STEP 4: Check button classes for premium/inmail indicators
+            try:
+                button_classes = message_button.get_attribute('class')
+                print_lg(f"DEBUG: Button classes: {button_classes}")
+
+                if 'premium' in button_classes.lower() or 'inmail' in button_classes.lower():
+                    result['is_free_message'] = False
+                    result['message_type'] = 'inmail'
+                    print_lg("DEBUG: ❌ Button has premium/inmail class - requires InMail")
+                    return result
+            except Exception as e:
+                print_lg(f"DEBUG: Could not check button classes: {e}")
+
+            # STEP 5: Default decision based on entry-point presence
+            # If button is in entry-point div and no premium indicators, assume free
+            result['is_free_message'] = True
+            result['message_type'] = 'free'
+            print_lg("DEBUG: ✅ Message button in entry-point div with no premium indicators - assuming FREE messaging")
+
+        finally:
+            # Close the modal if it was opened
+            if modal_opened:
+                try:
+                    # Try ESC key to close modal
+                    driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.ESCAPE)
+                    buffer(1)
+                    print_lg("DEBUG: Closed modal after check")
+                except Exception as e:
+                    print_lg(f"DEBUG: Error closing modal: {e}")
         
         return result
     
@@ -245,6 +448,13 @@ def check_message_capability(driver: WebDriver, hiring_team_section: WebElement)
         return result
 
 
+def clean_message_for_chrome(message: str) -> str:
+    '''
+    Remove non-BMP Unicode characters (emojis, etc.) that ChromeDriver can't handle.
+    '''
+    return ''.join(c for c in message if ord(c) < 0x10000)
+
+
 def generate_personalized_message(
     aiClient,
     recruiter_info: dict,
@@ -252,87 +462,98 @@ def generate_personalized_message(
     job_title: str,
     company_name: str,
     job_link: str
-) -> tuple[str, str]:
+) -> tuple[str, str, str]:
     '''
-    Generates a personalized message for the recruiter.
-    Returns (subject, body) tuple.
+    Generates a personalized message for the recruiter using random template selection for A/B testing.
+    Returns (subject, body, template_name) tuple.
     '''
-    # Extract recruiter first name
+    # Extract recruiter first name and title
     recruiter_name = recruiter_info.get('name', 'there').split()[0]
+    recruiter_full_name = recruiter_info.get('name', 'Recruiter')
+    recruiter_title = recruiter_info.get('title', 'Recruiter')
     your_name = f"{first_name} {last_name}"
-    
+
+    # Randomly select a message template for A/B testing
+    selected_template = random.choice(message_templates)
+    template_name = selected_template["name"]
+    print_lg(f"A/B Testing: Selected template '{template_name}' for recruiter {recruiter_name}")
+
     # Generate AI personalization if enabled
-    personalized_intro = ""
-    why_interested = ""
-    
+    ai_generated_body = ""
+
     if use_ai_for_messages and use_AI and aiClient:
         try:
-            # Generate personalized intro
-            intro_prompt = f"""Based on this job description, write a 2-sentence personalized introduction 
-explaining why the candidate is a good fit. Be specific about matching skills.
+            # Generate complete personalized message body
+            complete_prompt = generate_complete_message_prompt.format(
+                recruiter_name=recruiter_full_name,
+                recruiter_title=recruiter_title,
+                job_title=job_title,
+                company_name=company_name,
+                job_description=job_description[:1000],  # Limit description length
+                candidate_name=your_name,
+                years_of_experience=years_of_experience,
+                candidate_headline=headline,
+                candidate_summary=headline,  # Using headline as summary for now, could enhance later
+                candidate_skills="Java, Spring Boot, Microservices, Backend Development",  # Could be made dynamic
+                linkedin_profile=linkedIn,
+                portfolio_url=website,
+                phone_number=phone_number,
+                resume_link="https://drive.google.com/file/d/1kLdZWzTeRAAm4QtWrv2UQjHJ-H5ADOgd/view?usp=sharing",  # Hardcoded for now
+                job_link=job_link
+            )
 
-Job Title: {job_title}
-Company: {company_name}
-Job Description: {job_description[:500]}
-Candidate Experience: {years_of_experience} years in backend development with Java"""
-            
             if ai_provider.lower() == "openai":
-                personalized_intro = ai_answer_question(aiClient, intro_prompt, question_type="text")
+                ai_generated_body = ai_answer_question(aiClient, complete_prompt, question_type="text")
             elif ai_provider.lower() == "deepseek":
-                personalized_intro = deepseek_answer_question(aiClient, intro_prompt, question_type="text")
+                ai_generated_body = deepseek_answer_question(aiClient, complete_prompt, question_type="text")
             elif ai_provider.lower() == "gemini":
-                personalized_intro = gemini_answer_question(aiClient, intro_prompt, question_type="text")
-            
-            # Generate why interested
-            interest_prompt = f"""Write 1 sentence explaining why the candidate is interested in this role, 
-focusing on growth opportunity or company reputation.
+                ai_generated_body = gemini_answer_question(aiClient, complete_prompt, question_type="text")
 
-Job Title: {job_title}
-Company: {company_name}"""
-            
-            if ai_provider.lower() == "openai":
-                why_interested = ai_answer_question(aiClient, interest_prompt, question_type="text")
-            elif ai_provider.lower() == "deepseek":
-                why_interested = deepseek_answer_question(aiClient, interest_prompt, question_type="text")
-            elif ai_provider.lower() == "gemini":
-                why_interested = gemini_answer_question(aiClient, interest_prompt, question_type="text")
-            
-            print_lg(f"AI-generated personalization completed")
-            
+            print_lg(f"AI-generated complete personalized message completed")
+
         except Exception as e:
-            print_lg(f"Failed to generate AI personalization: {e}")
-            personalized_intro = ""
-            why_interested = ""
-    
-    # Format subject
-    subject = message_subject.format(
+            print_lg(f"Failed to generate AI personalized message: {e}")
+            ai_generated_body = ""
+
+    # Format subject from selected template
+    subject = selected_template["subject"].format(
         job_title=job_title,
         company_name=company_name,
         recruiter_name=recruiter_name
     )
-    
-    # Format message body
-    body = message_template.format(
-        recruiter_name=recruiter_name,
-        job_title=job_title,
-        company_name=company_name,
-        job_link=job_link,
-        your_name=your_name,
-        years_of_experience=years_of_experience,
-        personalized_intro=personalized_intro,
-        why_interested=why_interested,
-        key_skills="Java, Spring Boot, Microservices"  # Can be made dynamic later
-    ).strip()
-    
+
+    # Use AI-generated body if available, otherwise use selected template
+    if ai_generated_body and ai_generated_body.strip():
+        body = ai_generated_body.strip()
+    else:
+        # Use selected template body with fallback values for personalized_intro and why_interested
+        personalized_intro = ""
+        why_interested = ""
+        body = selected_template["body"].format(
+            recruiter_name=recruiter_name,
+            job_title=job_title,
+            company_name=company_name,
+            job_link=job_link,
+            your_name=your_name,
+            years_of_experience=years_of_experience,
+            personalized_intro=personalized_intro,
+            why_interested=why_interested,
+            key_skills="Java, Spring Boot, Microservices"
+        ).strip()
+
+    # Clean message for ChromeDriver compatibility
+    subject = clean_message_for_chrome(subject)
+    body = clean_message_for_chrome(body)
+
     # Ensure message is within LinkedIn limits
     # Subject: 200 chars, Body: 1900 chars for regular messages
     if len(subject) > 200:
         subject = subject[:197] + "..."
-    
+
     if len(body) > 1900:
         body = body[:1897] + "..."
-    
-    return subject, body
+
+    return subject, body, template_name
 
 
 def send_message_to_recruiter(
@@ -357,54 +578,135 @@ def send_message_to_recruiter(
     print_lg(f"DEBUG: Attempting to send message to {recruiter_info['name']} - Free: {recruiter_info.get('is_free_message', 'Unknown')}")
     try:
         # Find and click message button
-        # VERIFIED XPATH: Use normalize-space for checking text to handle whitespace/newlines
+        global_message_selectors = [
+            (By.XPATH, "//button[contains(normalize-space(.), 'Message') or contains(@aria-label, 'Message')]"),
+            (By.CSS_SELECTOR, "button[aria-label*='Message']"),
+            (By.XPATH, "//button[contains(@data-test-id, 'message-button')]"),
+            (By.XPATH, "//button[contains(@title, 'Message')]"),
+            (By.XPATH, "//button[@data-control-name='message']"),
+            (By.CSS_SELECTOR, "button[data-control-name='message']"),
+            (By.XPATH, "//button[contains(@class, 'message') and not(contains(@class, 'premium'))]"),
+            (By.XPATH, "//button[@data-control-name='message_from_profile']"),
+            (By.XPATH, "//button[contains(@aria-label, 'Send message to')]"),
+            (By.XPATH, "//button[contains(@data-tracking-control-name, 'message')]"),
+        ]
+
+        hiring_team_message_selectors = [
+            (By.XPATH, "//div[contains(@class, 'artdeco-card')]//button[contains(normalize-space(.), 'Message')]"),
+            (By.CSS_SELECTOR, "div[class*='card'] button[aria-label*='Message']"),
+            (By.XPATH, "//div[contains(@class, 'hirer-card')]//button[@data-control-name='message']"),
+            (By.XPATH, "//div[contains(@class, 'hirer-card')]//button[@data-control-name='message_from_profile']"),
+            (By.XPATH, "//div[contains(@class, 'hirer-card')]//button[contains(@aria-label, 'Send message to')]"),
+        ]
+
         try:
-            message_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable(
-                (By.XPATH, "//button[contains(normalize-space(.), 'Message') or contains(@aria-label, 'Message')]")))
-        except TimeoutException:
-            # Fallback: Try looking specifically in the hiring team section if global search fails
-            message_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable(
-                (By.XPATH, "//div[contains(@class, 'artdeco-card')]//button[contains(normalize-space(.), 'Message')]")))
+            # Try global selectors first
+            message_button = robust_find_element(driver, global_message_selectors)
+        except NoSuchElementException:
+            # Fallback to hiring team section
+            message_button = robust_find_element(driver, hiring_team_message_selectors)
 
         # Scroll into view and click
         driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", message_button)
         buffer(1)
-        message_button.click()
-        msg_modal_open = True
-        buffer(2)  # Wait for modal to open
+
+        # Retry logic for opening message modal
+        max_modal_retries = 3
+        modal_opened = False
+        for attempt in range(max_modal_retries):
+            try:
+                message_button.click()
+                msg_modal_open = True
+
+                # Wait for modal to fully load using WebDriverWait for textarea placeholder
+                wait = WebDriverWait(driver, 10)
+                wait.until(EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'msg-form__contenteditable') and (@placeholder or @data-placeholder)]")))
+
+                # Add buffer sleep for modal animation
+                buffer(1)
+
+                modal_opened = True
+                print_lg(f"DEBUG: Message modal opened successfully on attempt {attempt + 1}")
+                break
+
+            except TimeoutException:
+                if attempt == max_modal_retries - 1:
+                    print_lg(f"DEBUG: Failed to open message modal after {max_modal_retries} attempts")
+                    raise
+                print_lg(f"DEBUG: Modal not loaded on attempt {attempt + 1}, retrying...")
+                buffer(2)  # Buffer before retry
 
         # Check if this is an InMail modal (uses credits)
+        inmail_selectors = [
+            (By.XPATH, "//section[contains(@class, 'msg-inmail-credits-display')]"),
+            (By.XPATH, "//p[contains(text(), 'InMail credits')]"),
+            (By.XPATH, "//*[contains(text(), 'Use') and contains(text(), 'InMail credits')]"),
+            (By.CSS_SELECTOR, "section[class*='inmail-credits']"),
+            (By.XPATH, "//div[contains(@class, 'inmail')]"),
+            (By.XPATH, "//div[contains(@class, 'premium-upsell')]"),
+            (By.CSS_SELECTOR, "div[class*='premium-upsell']"),
+            (By.XPATH, "//span[contains(text(), 'Premium')]"),
+            (By.XPATH, "//div[contains(@class, 'msg-inmail-upsell')]"),
+            (By.XPATH, "//div[contains(@aria-label, 'InMail credits')]"),
+            (By.XPATH, "//button[contains(@aria-label, 'Buy InMail credits')]"),
+        ]
+
+        is_inmail = False
         try:
-            inmail_credits_element = driver.find_element(By.XPATH,
-                "//section[contains(@class, 'msg-inmail-credits-display')] | //p[contains(text(), 'InMail credits')]")
+            inmail_credits_element = robust_find_element(driver, inmail_selectors)
             print_lg(f"DEBUG: InMail credits detected: {inmail_credits_element.text.strip()}")
-            # This is InMail, close modal without sending
-            print_lg("DEBUG: Skipping InMail to preserve credits")
-            return False, "SKIP: InMail Required (credits detected in modal)"
+            is_inmail = True
         except NoSuchElementException:
-            print_lg("DEBUG: No InMail credits detected - proceeding with free message")
+            print_lg("DEBUG: No InMail credits detected - proceeding with message")
+
+        # If InMail and we want to skip InMail, skip
+        if is_inmail and skip_inmail_required:
+            print_lg("DEBUG: Skipping InMail as per configuration")
+            return False, "SKIP: InMail Required (skip_inmail_required=True)"
+        elif is_inmail:
+            print_lg("DEBUG: Proceeding with InMail message (skip_inmail_required=False)")
 
         # Wait for message modal to appear
         wait = WebDriverWait(driver, 10)
-        
+
         # Find subject field (if present)
+        subject_selectors = [
+            (By.XPATH, "//input[@placeholder='Subject' or contains(@name, 'subject')]"),
+            (By.CSS_SELECTOR, "input[placeholder='Subject']"),
+            (By.XPATH, "//input[contains(@aria-label, 'Subject')]"),
+            (By.XPATH, "//input[contains(@id, 'subject')]"),
+            (By.XPATH, "//input[@name='subject']"),
+            (By.CSS_SELECTOR, "input[name='subject']"),
+            (By.XPATH, "//input[@data-test-id='subject-input']"),
+        ]
+
         try:
             print_lg("DEBUG: Waiting for Subject field...")
-            subject_field = wait.until(EC.presence_of_element_located(
-                (By.XPATH, "//input[@placeholder='Subject' or contains(@name, 'subject')]")))
+            subject_field = robust_find_element(driver, subject_selectors)
             subject_field.clear()
             subject_field.send_keys(subject)
             print_lg("DEBUG: ✅ Subject typed")
-        except TimeoutException:
+        except NoSuchElementException:
             print_lg("DEBUG: Subject field not found - assuming regular message (not InMail)")
-        
+
         # Find message body field
+        message_body_selectors = [
+            (By.XPATH, "//div[contains(@class, 'msg-form__contenteditable')]"),
+            (By.CSS_SELECTOR, "div[class*='msg-form'][class*='contenteditable']"),
+            (By.XPATH, "//div[contains(@contenteditable, 'true')]"),
+            (By.XPATH, "//div[contains(@role, 'textbox')]"),
+            (By.XPATH, "//div[contains(@aria-label, 'message')]"),
+            (By.XPATH, "//div[@contenteditable='true' and contains(@placeholder, 'Write a message')]"),
+            (By.CSS_SELECTOR, "div[contenteditable='true']"),
+            (By.XPATH, "//div[contains(@class, 'editor-content')]"),
+            (By.XPATH, "//div[contains(@aria-label, 'Write a message')]"),
+            (By.XPATH, "//div[@data-test-id='message-input']"),
+        ]
+
         print_lg("DEBUG: Waiting for Message Body field...")
         try:
-            # Use specific class for contenteditable
-            message_field = wait.until(EC.presence_of_element_located(
-                (By.XPATH, "//div[contains(@class, 'msg-form__contenteditable')]")))
-            
+            message_field = robust_find_element(driver, message_body_selectors)
+
             message_field.click()
             buffer(1)
 
@@ -431,7 +733,11 @@ def send_message_to_recruiter(
                 return False, "Text insertion failed"
 
             # Check send button
-            send_button_pre_check = driver.find_elements(By.XPATH, "//button[contains(@class, 'msg-form__send-btn')]")
+            send_button_pre_check_selectors = [
+                (By.XPATH, "//button[contains(@class, 'msg-form__send-btn')]"),
+                (By.CSS_SELECTOR, "button[class*='msg-form'][class*='send-btn']"),
+            ]
+            send_button_pre_check = robust_find_elements(driver, send_button_pre_check_selectors)
             is_send_enabled = len(send_button_pre_check) > 0 and send_button_pre_check[0].is_enabled()
 
             if not is_send_enabled:
@@ -441,27 +747,39 @@ def send_message_to_recruiter(
 
             print_lg("DEBUG: ✅ Message body process completed")
 
-        except TimeoutException:
+        except NoSuchElementException:
             print_lg("DEBUG: ❌ Could not find Message Body field!")
             return False, "Message Body field not found"
 
         # Find and click send button
+        send_button_selectors = [
+            (By.XPATH, "//button[contains(@class, 'msg-form__send-btn') or contains(text(), 'Send')]"),
+            (By.CSS_SELECTOR, "button[class*='msg-form'][class*='send-btn']"),
+            (By.XPATH, "//button[contains(@aria-label, 'Send')]"),
+            (By.XPATH, "//button[contains(@data-test-id, 'send-button')]"),
+            (By.XPATH, "//button[type='submit']"),
+            (By.XPATH, "//button[@data-control-name='send']"),
+            (By.CSS_SELECTOR, "button[data-control-name='send']"),
+            (By.XPATH, "//button[contains(@class, 'send-button')]"),
+            (By.XPATH, "//button[contains(@aria-label, 'Send message')]"),
+            (By.XPATH, "//button[@data-tracking-control-name='send_message']"),
+        ]
+
         print_lg("DEBUG: Waiting for Send button...")
         try:
-            send_button = driver.find_element(By.XPATH,
-                "//button[contains(@class, 'msg-form__send-btn') or contains(text(), 'Send')]")
-            
+            send_button = robust_find_element(driver, send_button_selectors)
+
             # Check if button is enabled
             if not send_button.is_enabled():
                  print_lg("DEBUG: ⚠️ Send button is disabled! attempting final force enablement...")
                  # One last try to enable it by focusing and blurring
                  driver.execute_script("arguments[0].focus(); arguments[0].blur();", message_field)
                  buffer(1)
-                 
+
                  if not send_button.is_enabled():
                      print_lg("DEBUG: ❌ Send button still disabled. Aborting to avoid stuck state.")
                      return False, "Send button disabled (text input failure)"
-            
+
             try:
                 send_button.click()
             except Exception as e:
@@ -476,7 +794,7 @@ def send_message_to_recruiter(
             msg_modal_open = False # Considered closed if sent successfully (usually auto-closes)
 
             return True, ""
-            
+
         except NoSuchElementException:
             print_lg("DEBUG: ❌ Send button not found!")
             return False, "Send button not found"
@@ -503,9 +821,25 @@ def send_message_to_recruiter(
             # 1. Close icon button (SVG)
             # 2. Text "Close your draft conversation"
             # 3. Minimize button (fallback)
-            close_buttons = driver.find_elements(By.XPATH,
-                """//button[contains(@class, 'msg-overlay-bubble-header__control') or contains(@aria-label, 'Close') or contains(@title, 'Close')]""")
-            
+            close_button_selectors = [
+                (By.XPATH, "//button[contains(@class, 'msg-overlay-bubble-header__control') or contains(@aria-label, 'Close') or contains(@title, 'Close')]"),
+                (By.CSS_SELECTOR, "button[aria-label='Close']"),
+                (By.XPATH, "//button[contains(@data-test-id, 'close-button')]"),
+                (By.XPATH, "//button[contains(text(), 'Close')]"),
+                (By.XPATH, "//button[@data-control-name='overlay.close_conversation_window']"),
+                (By.XPATH, "//button[contains(@aria-label, 'Dismiss')]"),
+            ]
+
+            close_buttons = []
+            for by, selector in close_button_selectors:
+                try:
+                    buttons = driver.find_elements(by, selector)
+                    if buttons:
+                        close_buttons.extend(buttons)
+                        break
+                except:
+                    continue
+
             if len(close_buttons) > 0:
                 print_lg(f"DEBUG: Found {len(close_buttons)} close buttons. Ensuring modal is closed...")
                 for btn in close_buttons:
@@ -513,19 +847,28 @@ def send_message_to_recruiter(
                         if btn.is_displayed():
                             btn.click()
                             buffer(1)
-                            
+
                             # Handle "Discard draft" popup if it appears
+                            discard_selectors = [
+                                (By.XPATH, "//button[contains(@class, 'artdeco-modal__confirm-btn') or contains(., 'Discard')]"),
+                                (By.CSS_SELECTOR, "button[class*='modal'][class*='confirm-btn']"),
+                                (By.XPATH, "//button[contains(text(), 'Discard')]"),
+                            ]
                             try:
-                                discard_btn = driver.find_element(By.XPATH, 
-                                    "//button[contains(@class, 'artdeco-modal__confirm-btn') or contains(., 'Discard')]")
-                                discard_btn.click()
-                                print_lg("DEBUG: Discarded draft to close modal")
+                                for by, sel in discard_selectors:
+                                    try:
+                                        discard_btn = driver.find_element(by, sel)
+                                        discard_btn.click()
+                                        print_lg("DEBUG: Discarded draft to close modal")
+                                        break
+                                    except:
+                                        continue
                             except:
                                 pass
                     except:
                         pass
             else:
-                 print_lg("DEBUG: ⚠️ No Close button found via new XPath")
+                 print_lg("DEBUG: ⚠️ No Close button found via any selector")
                  
         except Exception as e:
             print_lg(f"DEBUG: Error ensuring modal closed: {e}")
@@ -541,7 +884,8 @@ def track_sent_message(
     message_body: str,
     success: bool,
     skip_reason: str = "",
-    error_message: str = ""
+    error_message: str = "",
+    template_name: str = ""
 ) -> None:
     '''
     Records sent message or skip reason in CSV file.
@@ -549,7 +893,11 @@ def track_sent_message(
     try:
         # Ensure directory exists
         make_directories([message_history_file])
-        
+
+        # Generate unique message ID
+        message_id = str(uuid.uuid4())
+        recruiter_id = recruiter_info.get('recruiter_id', '')
+
         # Determine message type
         if recruiter_info.get('is_free_message'):
             if recruiter_info.get('message_type') == 'connection':
@@ -558,23 +906,29 @@ def track_sent_message(
                 msg_type = "Free Message"
         else:
             msg_type = "Skipped - InMail Required"
-        
-        # Determine success status
+
+        # Determine success status and handle SKIP: prefixed error messages
         if skip_reason:
             status = "Skipped"
+        elif error_message and error_message.startswith("SKIP: "):
+            status = "Skipped"
+            skip_reason = error_message[5:]  # Remove "SKIP: " prefix
+            error_message = ""
         elif success:
             status = "Sent"
         else:
             status = "Failed"
-        
+
         # Prepare row data
         row = [
+            message_id,
             job_id,
             job_title,
             company_name,
             job_link,
             recruiter_info.get('name', 'Unknown'),
             recruiter_info.get('title', 'Unknown'),
+            recruiter_id,
             recruiter_info.get('profile_link', ''),
             msg_type,
             subject,
@@ -582,30 +936,34 @@ def track_sent_message(
             datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             status,
             skip_reason,
-            error_message
+            error_message,
+            template_name,
+            '',  # Response Received (empty by default)
+            ''   # Response Date (empty by default)
         ]
-        
+
         # Check if file exists to determine if we need headers
         file_exists = os.path.exists(message_history_file)
-        
+
         # Write to CSV
         with open(message_history_file, 'a', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
-            
+
             # Write header if new file
             if not file_exists:
                 headers = [
-                    'Job ID', 'Job Title', 'Company', 'Job Link',
-                    'Recruiter Name', 'Recruiter Title', 'Recruiter Profile Link',
+                    'Message ID', 'Job ID', 'Job Title', 'Company', 'Job Link',
+                    'Recruiter Name', 'Recruiter Title', 'Recruiter ID', 'Recruiter Profile Link',
                     'Message Type', 'Subject', 'Message Body', 'Date Sent',
-                    'Status', 'Skip Reason', 'Error Message'
+                    'Status', 'Skip Reason', 'Error Message', 'Template Name',
+                    'Response Received', 'Response Date'
                 ]
                 writer.writerow(headers)
-            
+
             writer.writerow(row)
-        
-        print_lg(f"Tracking record saved for {recruiter_info.get('name', 'Unknown')}")
-    
+
+        print_lg(f"Tracking record saved for {recruiter_info.get('name', 'Unknown')} (ID: {message_id})")
+
     except Exception as e:
         print_lg(f"Failed to track message: {e}")
 
@@ -629,24 +987,24 @@ def should_skip_recruiter(recruiter_info: dict, job_id: str, already_applied: bo
     Determines if recruiter should be skipped.
     Returns (should_skip: bool, reason: str)
     '''
-    # Check if already messaged this recruiter
-    if recruiter_info['recruiter_id'] in messaged_recruiters:
-        return True, "Already messaged this recruiter today"
-    
     # Check if already applied to job
     if skip_if_already_applied and already_applied:
-        return True, "Already applied via Easy Apply"
-    
+        return True, "Already applied"
+
+    # Check if already messaged this recruiter
+    if recruiter_info['recruiter_id'] in messaged_recruiters:
+        return True, "Already contacted this recruiter today"
+
     # Check if InMail required but we want only free messages
     if skip_inmail_required and not recruiter_info['is_free_message']:
-        return True, "InMail required (preserving credits)"
-    
+        return True, "InMail Required"
+
     # Check daily limit
     if check_daily_message_limit():
-        return True, "Daily message limit reached"
-    
+        return True, "Daily limit reached"
+
     # Check if can message at all
     if not recruiter_info['can_message']:
         return True, "No message button available"
-    
+
     return False, ""
