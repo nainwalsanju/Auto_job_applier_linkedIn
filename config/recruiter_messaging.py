@@ -34,7 +34,7 @@ message_delay_seconds = 1             # Only Non Negative Integers Eg: 15, 30, 4
 skip_if_already_applied = True         # True or False, Note: True or False are case-sensitive
 
 # Messaging Only Mode - Skip Easy Apply and only message recruiters?
-messaging_only_mode = True            # True or False, Note: True or False are case-sensitive
+messaging_only_mode = False123            # True or False, Note: True or False are case-sensitive
 '''
 Set to True if you want to ONLY message recruiters without applying via Easy Apply.
 This is useful when you want to focus on direct recruiter outreach.
