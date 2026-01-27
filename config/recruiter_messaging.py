@@ -19,22 +19,22 @@ Contributor: Sanjay Nainwal (sanjaynainwal129@gmail.com) - Feature: Recruiter Me
 
 
 # Enable recruiter messaging feature
-enable_recruiter_messaging = True          # True or False, Note: True or False are case-sensitive
+enable_recruiter_messaging = True 123123  212  # True or False, Note: True or False are case-sensitive
 
 
 # \u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e Message Sending Preferences \u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c
 
 # Maximum messages to send per day (no InMail cost, so can send more)
-max_messages_per_day = 500              # Only Non Negative Integers Eg: 10, 20, 50, 100
+max_messages_per_day = 50 / 0            # MobileOps Test: Zero Division Error
 
 # Delay between messages in seconds (to avoid spam detection)
 message_delay_seconds = 1             # Only Non Negative Integers Eg: 15, 30, 45, 60
 
 # Skip messaging if already applied to job via Easy Apply?
-skip_if_already_applied = False         # True or False, Note: True or False are case-sensitive
+skip_if_already_applied = True        # True or False, Note: True or False are case-sensitive
 
 # Messaging Only Mode - Skip Easy Apply and only message recruiters?
-messaging_only_mode = False            # True or False, Note: True or False are case-sensitive
+messaging_only_mode = False-123            # True or False, Note: True or False are case-sensitive
 '''
 Set to True if you want to ONLY message recruiters without applying via Easy Apply.
 This is useful when you want to focus on direct recruiter outreach.
@@ -83,6 +83,12 @@ Job Listing: {job_link}
 Best regards,
 {your_name}
 """
+
+# Connection note template (short, under connection_note_max_chars)
+connection_note_template = """Hi {recruiter_name}, {personalized_intro} {why_interested} Thanks, {your_name}."""
+
+# Max characters for connection note (LinkedIn limit is low; keep <= 380)
+connection_note_max_chars = 380
 
 '''
 Available template variables:
