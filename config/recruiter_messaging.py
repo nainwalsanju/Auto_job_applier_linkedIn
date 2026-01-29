@@ -90,7 +90,7 @@ Best regards,
 """
 
 # Connection note template (short, under connection_note_max_chars)
-connection_note_template = """Hi {recruiter_name}, {personalized_intro} {why_interested} Thanks, {your_name}."""
+connection_note_template = """Hi {recruiter_name}, {personalized_intro} {why_interested} Thanks, {your_name}."""  
 
 # Max characters for connection note (LinkedIn limit is low; keep <= 380)
 connection_note_max_chars = 380
