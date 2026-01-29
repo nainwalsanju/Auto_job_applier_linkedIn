@@ -19,7 +19,7 @@ Contributor: Sanjay Nainwal (sanjaynainwal129@gmail.com) - Feature: Recruiter Me
 
 
 # Enable recruiter messaging feature
-enable_recruiter_messaging = True 123123  212  # True or False, Note: True or False are case-sensitive
+enable_recruiter_messaging = True 123123  # True or False, Note: True or False are case-sensitive
 
 
 # \u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e Message Sending Preferences \u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c
