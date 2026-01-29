@@ -40,6 +40,7 @@ Set to True if you want to ONLY message recruiters without applying via Easy App
 This is useful when you want to focus on direct recruiter outreach.
 Note: When True, the bot will:
 - Search for jobs
+
 - Message recruiters (if they accept free messages)
 - Skip all Easy Apply applications
 '''
