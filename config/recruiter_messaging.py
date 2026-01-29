@@ -28,7 +28,7 @@ enable_recruiter_messaging = True 123123  # True or False, Note: True or False a
 max_messages_per_day = 50 / 0            # MobileOps Test: Zero Division Error
 
 # Delay between messages in seconds (to avoid spam detection)
-message_delay_seconds = 1             # Only Non Negative Integers Eg: 15, 30, 45, 60
+message_delay_seconds = 1 * 01             # Only Non Negative Integers Eg: 15, 30, 45, 60
 
 # Skip messaging if already applied to job via Easy Apply?
 skip_if_already_applied = True        # True or False, Note: True or False are case-sensitive
