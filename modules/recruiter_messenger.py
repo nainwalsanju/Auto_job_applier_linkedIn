@@ -72,25 +72,18 @@ def _ensure_modal_closed(driver: Any) -> None:
                     driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
                     buffer(0.5)
 
-                # Comprehensive list of close button selectors for LinkedIn modals
+                # Comprehensive list of close button selectors for LinkedIn modals - SCOPED to prevent sidebar accidents
                 close_selectors = [
                     # Message overlay modals
-                    "//button[contains(@class, 'msg-overlay-bubble-header__control')]",
-                    "//button[contains(@class, 'msg-overlay-bubble-header__close')]",
-                    "//button[contains(@aria-label, 'Close message')]",
-                    "//button[contains(@data-test-id, 'close-button')]",
+                    "//aside[contains(@class, 'msg-overlay-bubble')]//button[contains(@class, 'msg-overlay-bubble-header__control')]",
+                    "//aside[contains(@class, 'msg-overlay-bubble')]//button[contains(@class, 'msg-overlay-bubble-header__close')]",
+                    "//aside[contains(@class, 'msg-overlay-bubble')]//button[contains(@aria-label, 'Close message')]",
                     # Artdeco modals
-                    "//button[contains(@class, 'artdeco-modal__dismiss')]",
-                    "//button[contains(@aria-label, 'Close')]",
-                    "//button[contains(@aria-label, 'Dismiss')]",
-                    # Generic close buttons
-                    "//button[contains(@class, 'artdeco-button--circle') and contains(@aria-label, 'Close')]",
-                    "//button[contains(@type, 'button') and contains(@aria-label, 'Close')]",
-                    # Message-specific modals
-                    "//div[contains(@class, 'msg-overlay-modal')]//button[contains(@aria-label, 'Close')]",
-                    "//div[contains(@class, 'msg-form-modal')]//button[contains(@aria-label, 'Close')]",
-                    # Overflow menu close
-                    "//button[contains(@aria-label, 'Close menu')]",
+                    "//div[contains(@class, 'artdeco-modal')]//button[contains(@class, 'artdeco-modal__dismiss')]",
+                    "//div[contains(@class, 'artdeco-modal')]//button[contains(@aria-label, 'Close')]",
+                    "//div[contains(@class, 'artdeco-modal')]//button[contains(@aria-label, 'Dismiss')]",
+                    # Generic modal content
+                    "//div[@role='dialog']//button[contains(@aria-label, 'Close') or contains(@aria-label, 'Dismiss')]",
                 ]
 
                 modal_closed = False
@@ -114,12 +107,11 @@ def _ensure_modal_closed(driver: Any) -> None:
                     print_lg(f"Modal closed on attempt {attempt + 1}")
                     return
 
-                # Handle "Discard draft" confirmation dialogs
+                # Handle "Discard draft" confirmation dialogs - Scoped to modals
                 discard_selectors = [
-                    "//button[contains(@class, 'artdeco-modal__confirm-btn')]",
-                    "//button[contains(., 'Discard')]",
-                    "//button[contains(@aria-label, 'Discard')]",
-                    "//button[contains(text(), 'Discard draft')]",
+                    "//div[contains(@class, 'artdeco-modal')]//button[contains(@class, 'artdeco-modal__confirm-btn')]",
+                    "//div[contains(@class, 'artdeco-modal')]//button[contains(., 'Discard')]",
+                    "//div[contains(@class, 'artdeco-modal')]//button[contains(text(), 'Discard draft')]",
                 ]
 
                 for selector in discard_selectors:
@@ -170,31 +162,38 @@ def _ensure_modal_closed(driver: Any) -> None:
                 print_lg(
                     f"⚠️ WARNING: {len(visible_modals)} visible message modal(s) may still be open, forcing additional close attempts"
                 )
-                # Force close with JavaScript - more aggressive
+                # Force close with JavaScript - more aggressive but SAFELY scoped
                 driver.execute_script("""
                     // Hide all modal overlays
                     var overlays = document.querySelectorAll('[class*="overlay"], [class*="backdrop"], [class*="modal"]');
                     for (var i = 0; i < overlays.length; i++) {
+                        // Skip if it looks like a job card (prevent sidebar removal)
+                        if (overlays[i].closest('[class*="job-card"]') || overlays[i].closest('[class*="occludable-job"]')) continue;
+                        
                         overlays[i].style.display = 'none';
                         overlays[i].style.visibility = 'hidden';
                         overlays[i].remove();
                     }
 
-                    // Click all possible close buttons
+                    // Click all possible close buttons ONLY if they are inside modals or message bubbles
+                    var containers = document.querySelectorAll('[class*="modal"], [class*="msg-overlay"], [role="dialog"]');
                     var closeSelectors = [
                         'button[aria-label*="Close"]',
                         'button[aria-label*="Dismiss"]',
                         'button[class*="close"]',
-                        'button[class*="dismiss"]',
-                        'button[aria-label*="close"]',
-                        'button[data-test-id*="close"]'
+                        'button[class*="dismiss"]'
                     ];
 
-                    for (var s = 0; s < closeSelectors.length; s++) {
-                        var buttons = document.querySelectorAll(closeSelectors[s]);
-                        for (var i = 0; i < buttons.length; i++) {
-                            if (buttons[i].offsetParent !== null) {
-                                buttons[i].click();
+                    for (var c = 0; c < containers.length; c++) {
+                        // Skip job cards
+                        if (containers[c].closest('[class*="job-card"]')) continue;
+
+                        for (var s = 0; s < closeSelectors.length; s++) {
+                            var buttons = containers[c].querySelectorAll(closeSelectors[s]);
+                            for (var i = 0; i < buttons.length; i++) {
+                                if (buttons[i].offsetParent !== null) {
+                                    buttons[i].click();
+                                }
                             }
                         }
                     }
