@@ -7,7 +7,7 @@ Regenerate with: `python execution/generate_agent_context.py`
 
 - Project Name: LinkedIn AI Auto Job Applier
 - Project Root: PROJECT_ROOT
-- Generated On: February 04, 2026
+- Generated On: February 05, 2026
 
 ## User Profile (Redacted)
 
