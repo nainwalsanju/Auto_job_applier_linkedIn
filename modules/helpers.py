@@ -46,6 +46,14 @@ except (ImportError, Exception):
 
 from config.settings import logs_folder_path
 
+# Global session statistics for reporting
+session_stats = {
+    "jobs_processed": 0,
+    "messages_sent": 0,
+    "ai_requests": 0,
+    "start_time": datetime.now(),
+}
+
 
 #### Common functions ####
 

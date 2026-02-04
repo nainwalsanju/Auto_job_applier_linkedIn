@@ -963,6 +963,7 @@ def apply_to_jobs(search_terms: list[str]) -> None:
                                 job, blacklisted_companies, rejected_jobs
                             )
                         )
+                        session_stats["jobs_processed"] += 1
                     except Exception as stale_err:
                         if "stale element" in str(stale_err).lower():
                             print_lg(
@@ -1131,10 +1132,13 @@ def apply_to_jobs(search_terms: list[str]) -> None:
                         ##> ------ Yang Li : MARKYangL - Feature ------
                         try:
                             if ai_provider.lower() == "openai":
+                                session_stats["ai_requests"] += 1
                                 skills = ai_extract_skills(aiClient, description)
                             elif ai_provider.lower() == "deepseek":
+                                session_stats["ai_requests"] += 1
                                 skills = deepseek_extract_skills(aiClient, description)
                             elif ai_provider.lower() == "gemini":
+                                session_stats["ai_requests"] += 1
                                 skills = gemini_extract_skills(aiClient, description)
                             else:
                                 skills = "In Development"
@@ -1635,12 +1639,15 @@ def main() -> None:
         #         print_lg("Opening OpenAI chatGPT tab failed!")
         if use_AI:
             if ai_provider == "openai":
+                session_stats["ai_requests"] += 1
                 aiClient = ai_create_openai_client()
             ##> ------ Yang Li : MARKYangL - Feature ------
             # Create DeepSeek client
             elif ai_provider == "deepseek":
+                session_stats["ai_requests"] += 1
                 aiClient = deepseek_create_client()
             elif ai_provider == "gemini":
+                session_stats["ai_requests"] += 1
                 aiClient = gemini_create_client()
             ##<
 
@@ -1761,6 +1768,7 @@ def main() -> None:
             except Exception as e:
                 print_lg("Failed to close AI client:", e)
         ##<
+        finalize_session(session_stats)
         try:
             if driver:
                 driver.quit()

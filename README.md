@@ -38,6 +38,15 @@ Click on above image to watch the demo or use this link https://youtu.be/gMbB1fW
 
 <br>
 
+## 📁 Modernized Project Structure
+The project has been optimized for reliability and cleaner organization:
+- **`execution/`**: Core bot logic and orchestration scripts.
+- **`modules/`**: Shared utilities, AI connectors, and UI interaction logic.
+- **`directives/`**: Standard Operating Procedures (SOPs) for the bot and AI agents.
+- **`data/`**: Consolidated storage for your excels and resumes (ignored by git).
+- **`web_ui/`**: Flask-based interface for managing job history.
+- **`config/`**: Configuration files (use `.example.py` templates for new setups).
+
 ## ⚙️ How to install
 1. [Python 3.10](https://www.python.org/) or above. Visit https://www.python.org/downloads/ to download and install Python, or for windows you could visit Microsoft Store and search for "Python". **Please make sure Python is added to Path in System Environment Variables**.
 2. Install necessary [Undetected Chromedriver](https://pypi.org/project/undetected-chromedriver/), [PyAutoGUI](https://pypi.org/project/PyAutoGUI/) and [Setuptools](https://pypi.org/project/setuptools/) packages. After Python is installed, OPEN a console/terminal or shell, Use below command that uses the [pip](https://pip.pypa.io/en/stable) command-line tool to install these 3 package.
@@ -65,10 +74,11 @@ Click on above image to watch the demo or use this link https://youtu.be/gMbB1fW
 5. (Optional) Open `recruiter_messaging.py` file in `/config` folder to configure automated recruiter messaging. Enable/disable messaging, set daily limits, customize message templates, and configure InMail preservation settings.
 6. Open `settings.py` file in `/config` folder to configure the bot settings like, keep screen awake, click intervals (click intervals are randomized to seem like human behavior), run in background, stealth mode (to avoid bot detection), etc. as per your needs.
 6. (Optional) Don't forget to add you default resume in the location you mentioned in `default_resume_path = "data/resumes/default/resume.pdf"` given in `/config/questions.py`. If one is not provided, it will use your previous resume submitted in LinkedIn or (In Development) generate custom resume if OpenAI APT key is provided!
-7. Run `python execution/run_bot.py` for auto job application with recruiter messaging.
-8. For standalone messaging to recruiters and connections, run `python execution/messaging_utility.py`.
-9. To run the Applied Jobs history UI, run `python app.py` and open web browser on `http://localhost:5000`.
-10. If you have questions or need help setting it up or to talk in general, join the github server: https://discord.gg/fFp7uUzWCY
+7. **Security**: We recommend creating a `.env` file from `.env.example` in the root directory to store your API keys and LinkedIn credentials safely.
+8. Run `python execution/run_bot.py` for auto job application with recruiter messaging.
+9. For standalone messaging to recruiters and connections, run `python execution/messaging_utility.py`.
+10. To run the Applied Jobs history UI, run `python web_ui/app.py` and open web browser on `http://localhost:5000`.
+11. If you have questions or need help setting it up or to talk in general, join the github server: https://discord.gg/fFp7uUzWCY
 
 [back to index](#-content)
 

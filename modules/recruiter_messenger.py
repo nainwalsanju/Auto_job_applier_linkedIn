@@ -32,7 +32,7 @@ import time
 from config.recruiter_messaging import *
 from config.personals import first_name, last_name
 from config.questions import years_of_experience
-from modules.helpers import print_lg, buffer, make_directories
+from modules.helpers import print_lg, buffer, make_directories, session_stats
 from modules.bot_logger import (
     log_step,
     log_html_snapshot,
@@ -835,14 +835,17 @@ Job Description: {job_description[:1000]}
 Candidate Experience: {years_of_experience} years in backend development with Java"""
 
             if ai_provider.lower() == "openai":
+                session_stats["ai_requests"] += 1
                 personalized_intro = ai_answer_question(
                     aiClient, intro_prompt, question_type="text"
                 )
             elif ai_provider.lower() == "deepseek":
+                session_stats["ai_requests"] += 1
                 personalized_intro = deepseek_answer_question(
                     aiClient, intro_prompt, question_type="text"
                 )
             elif ai_provider.lower() == "gemini":
+                session_stats["ai_requests"] += 1
                 personalized_intro = gemini_answer_question(
                     aiClient, intro_prompt, question_type="text"
                 )
@@ -929,14 +932,17 @@ Job Description: {job_description[:800]}
 Candidate Experience: {years_of_experience} years in backend development with Java"""
 
             if ai_provider.lower() == "openai":
+                session_stats["ai_requests"] += 1
                 personalized_intro = ai_answer_question(
                     aiClient, intro_prompt, question_type="text"
                 )
             elif ai_provider.lower() == "deepseek":
+                session_stats["ai_requests"] += 1
                 personalized_intro = deepseek_answer_question(
                     aiClient, intro_prompt, question_type="text"
                 )
             elif ai_provider.lower() == "gemini":
+                session_stats["ai_requests"] += 1
                 personalized_intro = gemini_answer_question(
                     aiClient, intro_prompt, question_type="text"
                 )
@@ -1853,6 +1859,7 @@ def send_message_to_recruiter(
             )
 
         messages_sent_today += 1
+        session_stats["messages_sent"] += 1
         action_type = recruiter_info.get("button_type", "message")
         recruiter_key = f"{recruiter_info.get('recruiter_id', 'unknown')}:{action_type}"
         messaged_recruiters.add(recruiter_key)
