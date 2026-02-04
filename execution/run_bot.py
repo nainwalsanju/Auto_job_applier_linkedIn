@@ -1591,6 +1591,10 @@ linkedIn_tab = False
 def main() -> None:
     try:
         global linkedIn_tab, tabs_count, useNewResume, aiClient
+
+        # Maintenance: Cleanup old debug artifacts
+        cleanup_artifacts()
+
         alert_title = "Error Occurred. Closing Browser!"
         total_runs = 1
 

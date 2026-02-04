@@ -1,25 +1,28 @@
-__pycache__
-.vscode
-
-all excels
-all resumes
-logs
-
-old
-
-secrets.py
+# User Configs (Keep local)
+config/secrets.py
 config/personals.py
-.venv
-apikeys.py
+config/questions.py
+config/search.py
+config/settings.py
+config/resume.py
+config/recruiter_messaging.py
+
+# Excel & Outputs
+all excels/
+all resumes/
+logs/
 
 # Debug & Temp files
 debug_html_dumps/
 *.html
-verify_fix.py
-debug_user_snippet.html
-.idea
-.env
+*.log
 .tmp/
-.agent/.roo/
-.agent/
-.roo/
+.DS_Store
+
+# Python & IDEs
+__pycache__/
+.vscode/
+.idea/
+.venv/
+venv/
+.env

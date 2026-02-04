@@ -87,3 +87,22 @@ sequenceDiagram
 - **Messages Sent**: Count of successful messages.
 - **CSV Log**: Detailed history in `all excels/recruiter_messages_history.csv`.
 - **Console Logs**: Debug information for monitoring (includes AI generated text).
+
+## Technical Reference & AI Integration
+
+### Core Functions
+- `find_recruiter_on_job_page(driver)`: Extracts recruiter details using multi-strategy XPath/CSS.
+- `check_message_capability(driver, hiring_team_section)`: Detects if messaging is free or requires InMail credits.
+- `generate_personalized_message(aiClient, ...)`: **Primary AI Integration Point**. Generates JIT messages to avoid token waste.
+- `send_message_to_recruiter(driver, ...)`: Handles the actual UI interaction, including bubble management and name verification.
+- `track_sent_message(...)`: Logs results for performance analysis and AI pattern learning.
+
+### Optimization Features
+1. **Bubble Management**: Automatically closes existing messaging bubbles to prevent "full bar" UI blocking.
+2. **Strict Verification**: Verifies recruiter name in the chat header before typing to prevent mis-targeted messages.
+3. **Structured Logging**: Uses `SKIP: {reason}` or `ERROR: {desc}` prefixes for easy parsing by monitoring agents.
+4. **Adaptive Timing**: Uses specific delays (5s for bubble, 3s for input) to match LinkedIn's rendering speed.
+
+### Performance Monitoring
+- Results are logged to `all excels/recruiter_messages_history.csv`.
+- AI Agent can use this data to optimize success prediction and personalize message templates.
