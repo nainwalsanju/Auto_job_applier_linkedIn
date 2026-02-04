@@ -100,6 +100,10 @@ stream_output = (
 """
 Set `stream_output = True` if you want to stream AI output or `stream_output = False` if not.
 """
+
+# Telegram Configuration
+telegram_bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "your_bot_token_here")
+telegram_chat_id = os.getenv("TELEGRAM_CHAT_ID", "your_chat_id_here")
 ##
 
 ############################################################################################################

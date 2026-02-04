@@ -68,6 +68,12 @@ except ImportError:
 
 from modules.open_chrome import *
 from modules.helpers import *
+from modules.notifications import (
+    notify_job_applied,
+    notify_session_summary,
+    notify_error,
+)
+import modules.resume_tailor as resume_tailor
 from modules.clickers_and_finders import *
 from modules.validator import validate_config
 from modules.ai.openaiConnections import (
@@ -903,6 +909,51 @@ def discard_job() -> None:
     wait_span_click(driver, "Discard", 2)
 
 
+def tailor_application_resume(job_title, company, description, aiClient):
+    """
+    Generates tailored resume content and returns the path to the new PDF.
+    """
+    try:
+        from modules.ai.prompts import tailor_resume_prompt
+
+        print_lg(f"🧠 AI: Generating tailored content for {job_title} at {company}...")
+
+        candidate_info = resume_tailor.get_candidate_base_info()
+        prompt = tailor_resume_prompt.format(
+            job_title=job_title,
+            company_name=company,
+            job_description=description[:2000],
+            candidate_info=candidate_info,
+        )
+
+        tailored_content = ""
+        if ai_provider.lower() == "openai":
+            session_stats["ai_requests"] += 1
+            tailored_content = ai_answer_question(
+                aiClient, prompt, question_type="text"
+            )
+        elif ai_provider.lower() == "deepseek":
+            session_stats["ai_requests"] += 1
+            tailored_content = deepseek_answer_question(
+                aiClient, prompt, question_type="text"
+            )
+        elif ai_provider.lower() == "gemini":
+            session_stats["ai_requests"] += 1
+            tailored_content = gemini_answer_question(
+                aiClient, prompt, question_type="text"
+            )
+
+        if tailored_content:
+            pdf_path = resume_tailor.generate_tailored_pdf(
+                tailored_content, job_title, company
+            )
+            return pdf_path
+        return None
+    except Exception as e:
+        print_lg(f"⚠️ Failed to tailor resume: {e}")
+        return None
+
+
 # Function to apply to jobs
 def apply_to_jobs(search_terms: list[str]) -> None:
     applied_jobs = get_applied_job_ids()
@@ -1332,8 +1383,31 @@ def apply_to_jobs(search_terms: list[str]) -> None:
                                         job_description=description,
                                     )
                                     if useNewResume and not uploaded:
+                                        # Use tailored resume if enabled
+                                        current_resume_path = default_resume_path
+                                        try:
+                                            if (
+                                                enable_resume_tailoring
+                                                and use_AI
+                                                and aiClient
+                                            ):
+                                                tailored_path = (
+                                                    tailor_application_resume(
+                                                        title,
+                                                        company,
+                                                        description,
+                                                        aiClient,
+                                                    )
+                                                )
+                                                if tailored_path:
+                                                    current_resume_path = tailored_path
+                                        except Exception as tailor_err:
+                                            print_lg(
+                                                f"Resume tailoring skipped: {tailor_err}"
+                                            )
+
                                         uploaded, resume = upload_resume(
-                                            modal, default_resume_path
+                                            modal, current_resume_path
                                         )
                                     try:
                                         next_button = modal.find_element(
@@ -1769,6 +1843,12 @@ def main() -> None:
                 print_lg("Failed to close AI client:", e)
         ##<
         finalize_session(session_stats)
+        try:
+            from modules.notifications import notify_session_summary
+
+            notify_session_summary(session_stats)
+        except Exception as e:
+            print_lg(f"Failed to send final Telegram summary: {e}")
         try:
             if driver:
                 driver.quit()

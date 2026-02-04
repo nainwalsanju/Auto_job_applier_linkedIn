@@ -33,6 +33,7 @@ from config.recruiter_messaging import *
 from config.personals import first_name, last_name
 from config.questions import years_of_experience
 from modules.helpers import print_lg, buffer, make_directories, session_stats
+from modules.notifications import notify_job_applied, notify_error
 from modules.bot_logger import (
     log_step,
     log_html_snapshot,
@@ -1979,6 +1980,20 @@ def track_sent_message(
                 writer.writerow(headers)
 
             writer.writerow(row)
+
+        if status == "Sent":
+            try:
+                # Get personalization status
+                from config.recruiter_messaging import use_ai_for_messages
+
+                notify_job_applied(
+                    job_title=job_title,
+                    company=company_name,
+                    recruiter_name=recruiter_info.get("name", "Unknown"),
+                    ai_used=use_ai_for_messages,
+                )
+            except Exception as e:
+                print_lg(f"Telegram notification failed: {e}")
 
         print_lg(f"Tracking record saved for {recruiter_info.get('name', 'Unknown')}")
 

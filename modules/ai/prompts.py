@@ -6,19 +6,18 @@ Copyright (C) 2024 Sanjay Nainwal
 
 License:    GNU Affero General Public License
             https://www.gnu.org/licenses/agpl-3.0.en.html
-            
+
 GitHub:     https://github.com/nainwalsanju/Auto_job_applier_linkedIn
 
 version:    24.12.29.12.30
 """
-
 
 ##> Common Response Formats
 array_of_strings = {"type": "array", "items": {"type": "string"}}
 """
 Response schema to represent array of strings `["string1", "string2"]`
 """
-#<
+# <
 
 
 ##> Extract Skills
@@ -97,14 +96,14 @@ extract_skills_response_format = {
                 "required_skills",
                 "nice_to_have",
             ],
-            "additionalProperties": False
+            "additionalProperties": False,
         },
     },
 }
 """
 Response schema for `extract_skills` function
 """
-#<
+# <
 
 ##> ------ Dheeraj Deshwal : dheeraj9811 Email:dheeraj20194@iiitd.ac.in/dheerajdeshwal9811@gmail.com - Feature ------
 ##> Answer Questions
@@ -126,4 +125,23 @@ Respond concisely based on the type of question:
 **QUESTION Strat from here:**  
 {}
 """
-#<
+
+##> Tailor Resume / Cover Letter
+tailor_resume_prompt = """
+You are a professional career coach and resume writer. 
+Based on the provided Job Description and the candidate's Base Resume Information, generate a tailored "Statement of Purpose" or "Professional Summary" (approx 150-200 words) that highlights matching skills and experience.
+
+Format the output as a clean, professional letter/summary.
+DO NOT include any metadata, placeholders like [Date], or conversational filler.
+Start directly with the professional content.
+
+JOB TITLE: {job_title}
+COMPANY: {company_name}
+
+JOB DESCRIPTION:
+{job_description}
+
+CANDIDATE BASE INFO:
+{candidate_info}
+"""
+# <
