@@ -80,10 +80,10 @@ Notes:
 
 ## Paths
 
-- Default Resume: all resumes/default/resume.pdf
-- Generated Resumes: all resumes/
-- Applied Jobs CSV: all excels/all_applied_applications_history.csv
-- Failed Jobs CSV: all excels/all_failed_applications_history.csv
+- Default Resume: data/resumes/default/resume.pdf
+- Generated Resumes: data/resumes/
+- Applied Jobs CSV: data/excels/all_applied_applications_history.csv
+- Failed Jobs CSV: data/excels/all_failed_applications_history.csv
 - Logs Folder: logs/
 
 ## Security Notes

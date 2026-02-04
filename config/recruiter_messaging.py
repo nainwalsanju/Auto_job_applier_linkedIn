@@ -127,7 +127,7 @@ ai_personalization_level = "high"  # "low", "medium", "high"
 # \u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e Message History Tracking \u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c
 
 # File to track all sent messages (prevents duplicates)
-message_history_file = "all excels/recruiter_messages_history.csv"
+message_history_file = "data/excels/recruiter_messages_history.csv"
 
 
 # \u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e Testing and Safety \u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c

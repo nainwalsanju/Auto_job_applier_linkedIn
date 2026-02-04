@@ -28,5 +28,5 @@ Send personalized messages to LinkedIn connections and people you may know to bu
 
 ## Outputs
 - **Messages Sent**: Count of successful messages.
-- **CSV Log**: History in `all excels/people_messages_history.csv`.
+- **CSV Log**: History in `data/excels/people_messages_history.csv`.
 - **Console Logs**: Monitoring and debug information.

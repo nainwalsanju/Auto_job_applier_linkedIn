@@ -18,9 +18,9 @@ Automate the process of applying to jobs on LinkedIn using the `Auto_job_applier
    python execution/run_bot.py
    ```
 3. **Monitor**: Watch logs for "Login successful", job application progress, and recruiter messaging activities.
-4. **Handle Errors**: If bot fails, check `logs/`, `all excels/recruiter_messages_history.csv`, and refer to `DEBUGGING_RECOMMENDATIONS.md`.
+4. **Handle Errors**: If bot fails, check `logs/`, `data/excels/recruiter_messages_history.csv`, and refer to `DEBUGGING_RECOMMENDATIONS.md`.
 
 ## Outputs
 - **Logs**: Application logs in `logs/`.
-- **CSV**: Record of applied jobs (usually in `all excels/`).
-- **Recruiter Messages CSV**: History of sent recruiter messages in `all excels/recruiter_messages_history.csv`.
+- **CSV**: Record of applied jobs (usually in `data/excels/`).
+- **Recruiter Messages CSV**: History of sent recruiter messages in `data/excels/recruiter_messages_history.csv`.

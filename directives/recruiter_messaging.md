@@ -85,7 +85,7 @@ sequenceDiagram
 
 ## Outputs
 - **Messages Sent**: Count of successful messages.
-- **CSV Log**: Detailed history in `all excels/recruiter_messages_history.csv`.
+- **CSV Log**: Detailed history in `data/excels/recruiter_messages_history.csv`.
 - **Console Logs**: Debug information for monitoring (includes AI generated text).
 
 ## Technical Reference & AI Integration
@@ -104,5 +104,5 @@ sequenceDiagram
 4. **Adaptive Timing**: Uses specific delays (5s for bubble, 3s for input) to match LinkedIn's rendering speed.
 
 ### Performance Monitoring
-- Results are logged to `all excels/recruiter_messages_history.csv`.
+- Results are logged to `data/excels/recruiter_messages_history.csv`.
 - AI Agent can use this data to optimize success prediction and personalize message templates.

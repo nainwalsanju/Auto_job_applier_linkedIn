@@ -49,7 +49,7 @@ stop_date_cycle_at_24hr = False      # True or False, Note: True or False are ca
 # >>>>>>>>>>> RESUME GENERATOR (Experimental & In Development) <<<<<<<<<<<
 
 # Give the path to the folder where all the generated resumes are to be stored
-generated_resume_path = "all resumes/" # (In Development)
+generated_resume_path = "data/resumes/" # (In Development)
 
 
 
@@ -58,8 +58,8 @@ generated_resume_path = "all resumes/" # (In Development)
 # >>>>>>>>>>> Global Settings <<<<<<<<<<<
 
 # Directory and name of the files where history of applied jobs is saved (Sentence after the last "/" will be considered as the file name).
-file_name = "all excels/all_applied_applications_history.csv"
-failed_file_name = "all excels/all_failed_applications_history.csv"
+file_name = "data/excels/all_applied_applications_history.csv"
+failed_file_name = "data/excels/all_failed_applications_history.csv"
 logs_folder_path = "logs/"
 
 # Set the maximum amount of time allowed to wait between each click in secs

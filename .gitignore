@@ -7,9 +7,8 @@ config/settings.py
 config/resume.py
 config/recruiter_messaging.py
 
-# Excel & Outputs
-all excels/
-all resumes/
+# Data & Outputs
+data/
 logs/
 
 # Debug & Temp files

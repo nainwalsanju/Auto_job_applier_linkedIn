@@ -7,7 +7,7 @@ import os
 app = Flask(__name__)
 CORS(app)
 
-PATH = 'all excels/'
+PATH = 'data/excels/'
 ##> ------ Karthik Sarode : karthik.sarode23@gmail.com - UI for excel files ------
 @app.route('/')
 def home():

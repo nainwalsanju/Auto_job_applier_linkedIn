@@ -21,8 +21,28 @@ import json
 from time import sleep
 from random import randint
 from datetime import datetime, timedelta
-from pyautogui import alert
 from pprint import pprint
+from typing import Union, Callable
+
+try:
+    import pyautogui
+
+    def alert(text, title=None, button="OK"):
+        return pyautogui.alert(text=text, title=title, button=button)
+
+    def confirm(text, title=None, buttons=["OK", "Cancel"]):
+        return pyautogui.confirm(text=text, title=title, buttons=buttons)
+except (ImportError, Exception):
+
+    def alert(text, title=None, button="OK"):
+        print(f"\n[{title if title else 'Alert'}] {text}")
+        input(f"Press Enter to continue ({button})...")
+
+    def confirm(text, title=None, buttons=["OK", "Cancel"]):
+        print(f"\n[{title if title else 'Confirm'}] {text}")
+        choice = input(f"Enter your choice {buttons}: ")
+        return choice
+
 
 from config.settings import logs_folder_path
 
@@ -77,7 +97,7 @@ def critical_error_log(possible_reason: str, stack_trace: Exception) -> None:
     """
     Function to log and print critical errors along with datetime stamp
     """
-    print_lg(possible_reason, stack_trace, datetime.now(), from_critical=True)
+    print_lg(possible_reason, str(stack_trace), str(datetime.now()), from_critical=True)
 
 
 def get_log_path():
@@ -99,7 +119,7 @@ __logs_file_path = get_log_path()
 
 
 def print_lg(
-    *msgs: str | dict,
+    *msgs: Union[str, dict],
     end: str = "\n",
     pretty: bool = False,
     flush: bool = False,
@@ -174,7 +194,7 @@ def buffer(speed: int = 0) -> None:
         return sleep(randint(18, round(speed) * 10) * 0.1)
 
 
-def manual_login_retry(is_logged_in: callable, limit: int = 2) -> None:
+def manual_login_retry(is_logged_in: Callable[[], bool], limit: int = 2) -> None:
     """
     Function to ask and validate manual login
     """
@@ -195,8 +215,6 @@ def manual_login_retry(is_logged_in: callable, limit: int = 2) -> None:
         count += 1
 
         try:
-            from pyautogui import alert
-
             # alert returns the button text if clicked, which is truthy.
             if alert(message, "Login Required", button) and count > limit:
                 return
@@ -209,7 +227,7 @@ def manual_login_retry(is_logged_in: callable, limit: int = 2) -> None:
                 return
 
 
-def calculate_date_posted(time_string: str) -> datetime | None | ValueError:
+def calculate_date_posted(time_string: str) -> Union[datetime, None, ValueError]:
     """
     Function to calculate date posted from string.
     Returns datetime object | None if unable to calculate | ValueError if time_string is invalid

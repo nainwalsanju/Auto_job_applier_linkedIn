@@ -30,7 +30,7 @@ import threading
 csv.field_size_limit(1000000)  # Set to 1MB instead of default 131KB
 
 from random import choice, shuffle, randint
-from datetime import datetime
+from typing import Union, Any, Optional, List, Dict
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
@@ -362,9 +362,7 @@ def apply_filters() -> None:
             buttons = ["Turn off Pause after search", "Look's good, Continue"]
 
             try:
-                if "Turn off Pause after search" == pyautogui.confirm(
-                    msg, title, buttons
-                ):
+                if "Turn off Pause after search" == confirm(msg, title, buttons):
                     pause_after_filters = False
             except:
                 print_lg(f"\n✋ PAUSED: {msg}")
@@ -798,13 +796,13 @@ def failed_job(
             file.close()
     except Exception as e:
         print_lg("Failed to update failed jobs list!", e)
-        pyautogui.alert(
+        alert(
             "Failed to update the excel of failed jobs!\nProbably because of 1 of the following reasons:\n1. The file is currently open or in use by another program\n2. Permission denied to write to the file\n3. Failed to find the file",
             "Failed Logging",
         )
 
 
-def screenshot(driver: WebDriver, job_id: str, failedAt: str) -> str:
+def screenshot(driver: Any, job_id: str, failedAt: str) -> str:
     """
     Function to to take screenshot for debugging
     - Returns screenshot name as String
@@ -893,7 +891,7 @@ def submitted_jobs(
         csv_file.close()
     except Exception as e:
         print_lg("Failed to update submitted jobs list!", e)
-        pyautogui.alert(
+        alert(
             "Failed to update the excel of applied jobs!\nProbably because of 1 of the following reasons:\n1. The file is currently open or in use by another program\n2. Permission denied to write to the file\n3. Failed to find the file",
             "Failed Logging",
         )
@@ -1304,7 +1302,7 @@ def apply_to_jobs(search_terms: list[str]) -> None:
                                                 job_id,
                                                 "Needed manual intervention for failed question",
                                             )
-                                            pyautogui.alert(
+                                            alert(
                                                 'Couldn\'t answer one or more questions.\nPlease click "Continue" once done.\nDO NOT CLICK Back, Next or Review button in LinkedIn.\n\n\n\n\nYou can turn off "Pause at failed question" setting in config.py',
                                                 "Help Needed",
                                                 "Continue",
@@ -1367,7 +1365,7 @@ def apply_to_jobs(search_terms: list[str]) -> None:
                                 wait_span_click(driver, "Review", 1, scrollTop=True)
                                 cur_pause_before_submit = pause_before_submit
                                 if errored != "stuck" and cur_pause_before_submit:
-                                    decision = pyautogui.confirm(
+                                    decision = confirm(
                                         '1. Please verify your information.\n2. If you edited something, please return to this final screen.\n3. DO NOT CLICK "Submit Application".\n\n\n\n\nYou can turn off "Pause before submit" setting in config.py\nTo TEMPORARILY disable pausing, click "Disable Pause"',
                                         "Confirm your information",
                                         [
@@ -1405,7 +1403,7 @@ def apply_to_jobs(search_terms: list[str]) -> None:
                                 #
                                 #     # Show the confirm dialog to let the user inspect/edit.
                                 #     # If the user responds here within 5 seconds, we'll cancel the auto timer.
-                                #     decision = pyautogui.confirm(
+                                #     decision = confirm(
                                 #         '1. Please verify your information.\n'
                                 #         '2. If you edited something, please return to this final screen.\n'
                                 #         '3. DO NOT CLICK "Submit Application".\n\n\n\n\n'
@@ -1437,7 +1435,7 @@ def apply_to_jobs(search_terms: list[str]) -> None:
                                     errored != "stuck"
                                     and cur_pause_before_submit
                                     and "Yes"
-                                    in pyautogui.confirm(
+                                    in confirm(
                                         "You submitted the application, didn't you 😒?",
                                         "Failed to find Submit Application!",
                                         ["Yes", "No"],
@@ -1607,7 +1605,7 @@ def main() -> None:
         log_step("Config validated")
 
         if not os.path.exists(default_resume_path):
-            pyautogui.alert(
+            alert(
                 text='Your default resume "{}" is missing! Please update it\'s folder path "default_resume_path" in config.py\n\nOR\n\nAdd a resume with exact name and path (check for spelling mistakes including cases).\n\n\nFor now the bot will continue using your previous upload from LinkedIn!'.format(
                     default_resume_path
                 ),
