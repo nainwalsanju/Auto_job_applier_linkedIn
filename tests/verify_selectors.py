@@ -11,12 +11,12 @@ from typing import List, Dict, Tuple
 import json
 
 
-def find_html_files(results_dir: str = "results") -> List[str]:
+def find_html_files(results_dir: str = "debug_html_dumps") -> List[str]:
     """Find all HTML files in the results directory and subdirectories."""
     html_files = []
     for root, dirs, files in os.walk(results_dir):
         for file in files:
-            if file.endswith('.html'):
+            if file.endswith(".html"):
                 html_files.append(os.path.join(root, file))
     return html_files
 
@@ -24,7 +24,7 @@ def find_html_files(results_dir: str = "results") -> List[str]:
 def parse_html_file(file_path: str) -> html.HtmlElement:
     """Parse HTML file and return root element."""
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
         return html.fromstring(content)
     except Exception as e:
@@ -49,12 +49,14 @@ def find_hiring_team_section(tree: html.HtmlElement) -> List[html.HtmlElement]:
     return sections
 
 
-def test_selector_on_section(section: html.HtmlElement, selector: str, profile_id: str = None) -> List[html.HtmlElement]:
+def test_selector_on_section(
+    section: html.HtmlElement, selector: str, profile_id: str = None
+) -> List[html.HtmlElement]:
     """Test a single selector on a section, optionally with profile ID."""
     try:
         if profile_id:
             # Replace profile_id placeholder in selector
-            selector = selector.replace("profile_id',", f"'{profile_id}'")
+            selector = selector.replace("{profile_id}", profile_id)
 
         # Convert XPath selector to work with lxml (no double slashes at start for relative)
         if selector.startswith("//"):
@@ -79,9 +81,9 @@ def extract_profile_ids(section: html.HtmlElement) -> List[str]:
         # Find all profile links
         links = section.xpath(".//a[contains(@href, '/in/')]")
         for link in links:
-            href = link.get('href', '')
-            if '/in/' in href:
-                profile_id = href.split('/in/')[-1].split('/')[0].split('?')[0]
+            href = link.get("href", "")
+            if "/in/" in href:
+                profile_id = href.split("/in/")[-1].split("/")[0].split("?")[0]
                 if profile_id and profile_id not in profile_ids:
                     profile_ids.append(profile_id)
     except Exception as e:
@@ -105,33 +107,18 @@ def verify_selectors_on_file(file_path: str) -> Dict:
     if not sections:
         return {"file": file_path, "error": "No hiring team sections found"}
 
-    results = {
-        "file": file_path,
-        "sections": []
-    }
+    results = {"file": file_path, "sections": []}
 
-    # Message button selectors from recruiter_messenger.py (lines 664-685)
+    # Message button selectors from recruiter_messenger.py
     message_button_selectors = [
-        # PRIMARY: Exact path from profile link through hirer-card__hirer-information to entry-point
-        "//a[contains(@href, '/in/{profile_id}')]/following-sibling::div[contains(@class, 'hirer-card__hirer-information')]/following-sibling::div[contains(@class, 'entry-point')]/button[contains(text(), 'Message')]",
-
-        # Alternative: Entry-point as direct sibling of profile link (previous selector)
-        "//a[contains(@href, '/in/{profile_id}')]/following-sibling::div[contains(@class, 'entry-point')]//button[contains(., 'Message')]",
-
-        # Structural: Within hirer-card container structure
-        "//div[contains(@class, 'hirer-card__hirer-information')]//a[contains(@href, '/in/{profile_id}')]/ancestor::div[contains(@class, 'display-flex')]//following-sibling::div[contains(@class, 'entry-point')]//button[contains(text(), 'Message')]",
-
-        # Relative: Button within same ancestor container
-        "//a[contains(@href, '/in/{profile_id}')]/ancestor::div[contains(@class, 'hirer-card') or contains(@class, 'display-flex')]//div[contains(@class, 'entry-point')]//button[contains(text(), 'Message')]",
-
-        # Broad search: Any entry-point near the profile link
-        "//a[contains(@href, '/in/{profile_id}')]//ancestor::div[contains(@class, 'hirer-card')]/following-sibling::div[contains(@class, 'entry-point')]//button[contains(text(), 'Message')]",
-
-        # Fallback: Artdeco button with Message span text in same container
-        "//a[contains(@href, '/in/{profile_id}')]/ancestor::div[contains(@class, 'display-flex') and contains(@class, 'align-items-center')]//button[contains(@class, 'artdeco-button') and .//span[contains(text(), 'Message')]]",
-
-        # Last resort: Any artdeco-button with Message text near the profile, excluding msg-overlay
-        "//div[not(contains(@class, 'msg-overlay'))]//a[contains(@href, '/in/{profile_id}')]/ancestor::div[1]//button[contains(@class, 'artdeco-button')]//span[contains(text(), 'Message')]/ancestor::button",
+        # APPROACH 1: Find button via profile link/recruiter_id (MOST RELIABLE)
+        "//a[contains(@href, '/in/{profile_id}')]/ancestor::*[contains(@class,'artdeco-entity-lockup') or contains(@class,'hirer-card') or contains(@class,'display-flex')][1]//button[contains(@aria-label, 'Message') or .//span[normalize-space()='Message'] or contains(normalize-space(.), 'Message')]",
+        # Hiring team section specifically
+        "//section[.//h2[contains(text(),'Meet the hiring team')]]//a[contains(@href, '/in/{profile_id}')]/ancestor::div[1]//button[contains(@aria-label, 'Message') or contains(normalize-space(.), 'Message')]",
+        # APPROACH 2: Name-based matching (fallback)
+        "//*[contains(., '{profile_id}') and (contains(@class, 'artdeco-entity-lockup') or contains(@class, 'hirer-card') or contains(@class, 'display-flex'))]//button[contains(normalize-space(.), 'Message')]",
+        # APPROACH 3: ARIA-label direct lookup
+        "//button[contains(@aria-label, 'Message')]",  # Broad fallback
     ]
 
     for section_idx, section in enumerate(sections):
@@ -140,7 +127,7 @@ def verify_selectors_on_file(file_path: str) -> Dict:
         section_result = {
             "section_index": section_idx,
             "profile_ids": extract_profile_ids(section),
-            "selector_results": []
+            "selector_results": [],
         }
 
         # Test each selector
@@ -150,7 +137,9 @@ def verify_selectors_on_file(file_path: str) -> Dict:
             # Test for each profile ID found in the section
             found_buttons = []
             for profile_id in section_result["profile_ids"]:
-                buttons = test_selector_on_section(section, selector_template, profile_id)
+                buttons = test_selector_on_section(
+                    section, selector_template, profile_id
+                )
                 found_buttons.extend(buttons)
 
             # Also test without profile_id (for selectors that don't use it)
@@ -162,35 +151,37 @@ def verify_selectors_on_file(file_path: str) -> Dict:
             valid_buttons = []
             seen_buttons = set()
             for btn in found_buttons:
-                btn_classes = btn.get('class', '')
-                btn_id = btn.get('id', '')
+                btn_classes = btn.get("class", "")
+                btn_id = btn.get("id", "")
                 btn_text = btn.text_content().strip()
 
                 # Skip msg-overlay buttons
-                if 'msg-overlay' in btn_classes or 'msg-overlay' in btn_id:
+                if "msg-overlay" in btn_classes or "msg-overlay" in btn_id:
                     continue
 
                 # Skip non-Message buttons
-                if 'Message' not in btn_text:
+                if "Message" not in btn_text:
                     continue
 
                 # Create unique identifier
                 btn_key = f"{btn_classes}_{btn_id}_{btn_text}"
                 if btn_key not in seen_buttons:
                     seen_buttons.add(btn_key)
-                    valid_buttons.append({
-                        "text": btn_text,
-                        "class": btn_classes,
-                        "id": btn_id,
-                        "aria_label": btn.get('aria-label', ''),
-                        "data_control_name": btn.get('data-control-name', '')
-                    })
+                    valid_buttons.append(
+                        {
+                            "text": btn_text,
+                            "class": btn_classes,
+                            "id": btn_id,
+                            "aria_label": btn.get("aria-label", ""),
+                            "data_control_name": btn.get("data-control-name", ""),
+                        }
+                    )
 
             selector_result = {
                 "selector_index": selector_idx + 1,
                 "selector": selector_template,
                 "buttons_found": len(valid_buttons),
-                "buttons": valid_buttons
+                "buttons": valid_buttons,
             }
 
             section_result["selector_results"].append(selector_result)
@@ -208,7 +199,8 @@ def main():
 
     # Find all HTML files
     html_files = find_html_files()
-    print(f"Found {len(html_files)} HTML files to test")
+    html_files = sorted(html_files, key=os.path.getmtime, reverse=True)[:10]
+    print(f"Found {len(html_files)} HTML files to test (recent 10)")
 
     if not html_files:
         print("❌ No HTML files found in results/ directory")
@@ -237,7 +229,9 @@ def main():
         print(f"✅ {result['file']}:")
         for section in result["sections"]:
             total_sections += 1
-            print(f"   Section {section['section_index'] + 1}: {len(section['profile_ids'])} profiles")
+            print(
+                f"   Section {section['section_index'] + 1}: {len(section['profile_ids'])} profiles"
+            )
 
             working_selectors = []
             for sel_result in section["selector_results"]:
@@ -256,12 +250,16 @@ def main():
     print(f"   Selector success rates:")
 
     for sel_idx in range(1, 8):
-        success_rate = (selector_success_count[sel_idx] / total_sections * 100) if total_sections > 0 else 0
+        success_rate = (
+            (selector_success_count[sel_idx] / total_sections * 100)
+            if total_sections > 0
+            else 0
+        )
         print(".1f")
 
     # Save detailed results to JSON
     output_file = "selector_verification_results.json"
-    with open(output_file, 'w', encoding='utf-8') as f:
+    with open(output_file, "w", encoding="utf-8") as f:
         json.dump(all_results, f, indent=2, ensure_ascii=False)
 
     print(f"\n💾 Detailed results saved to: {output_file}")
@@ -277,7 +275,9 @@ def main():
 
     # Check if primary selector (1) works on all sections
     if selector_success_count[1] < total_sections:
-        issues.append(f"Primary selector (1) only worked on {selector_success_count[1]}/{total_sections} sections")
+        issues.append(
+            f"Primary selector (1) only worked on {selector_success_count[1]}/{total_sections} sections"
+        )
 
     if not issues:
         print("✅ No major issues identified")

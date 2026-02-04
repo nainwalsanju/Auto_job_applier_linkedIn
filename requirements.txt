@@ -16,3 +16,5 @@ pyscreeze
 pymsgbox
 pyperclip
 mouseinfo
+lxml
+webdriver-manager

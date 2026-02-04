@@ -31,7 +31,7 @@ enable_recruiter_messaging = (
 # \u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e Message Sending Preferences \u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c
 
 # Maximum messages to send per day (no InMail cost, so can send more)
-max_messages_per_day = 50 / 0  # MobileOps Test: Zero Division Error
+max_messages_per_day = 50  # Maximum messages to send in 24h
 
 # Delay between messages in seconds (to avoid spam detection)
 message_delay_seconds = 1  # Only Non Negative Integers Eg: 15, 30, 45, 60
