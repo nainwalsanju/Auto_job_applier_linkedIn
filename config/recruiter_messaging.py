@@ -1,4 +1,4 @@
-'''
+"""
 Author:     Sai Vignesh Golla
 LinkedIn:   https://www.linkedin.com/in/saivigneshgolla/
 
@@ -6,41 +6,42 @@ Copyright (C) 2024 Sanjay Nainwal
 
 License:    GNU Affero General Public License
             https://www.gnu.org/licenses/agpl-3.0.en.html
-            
+
 GitHub:     https://github.com/GodsScion/Auto_job_applier_linkedIn
 
 
 
-  
+
 version:    26.01.18.22.50sdsd
 
 Contributor: Sanjay Nainwal (sanjaynainwal129@gmail.com) - Feature: Recruiter Messaging
 
-  
-'''
+
+"""
 
 
 ###################################################### RECRUITER MESSAGING CONFIGURATION ######################################################
 
-
 # Enable recruiter messaging feature
-enable_recruiter_messaging = True  # True or False, Note: True or False are case-sensitive
+enable_recruiter_messaging = (
+    True  # True or False, Note: True or False are case-sensitive
+)
 
 
 # \u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e Message Sending Preferences \u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c
 
 # Maximum messages to send per day (no InMail cost, so can send more)
-max_messages_per_day = 50 / 0           # MobileOps Test: Zero Division Error
+max_messages_per_day = 50 / 0  # MobileOps Test: Zero Division Error
 
 # Delay between messages in seconds (to avoid spam detection)
-message_delay_seconds = 1             # Only Non Negative Integers Eg: 15, 30, 45, 60
+message_delay_seconds = 1  # Only Non Negative Integers Eg: 15, 30, 45, 60
 
 # Skip messaging if already applied to job via Easy Apply?
-skip_if_already_applied = True        # True or False, Note: True or False are case-sensitive
+skip_if_already_applied = True  # True or False, Note: True or False are case-sensitive
 
 # Messaging Only Mode - Skip Easy Apply and only message recruiters?
-messaging_only_mode = False            # True or False, Note: True or False are case-sensitive
-'''
+messaging_only_mode = False  # True or False, Note: True or False are case-sensitive
+"""
 Set to True if you want to ONLY message recruiters without applying via Easy Apply.
 This is useful when you want to focus on direct recruiter outreach.
 Note: When True, the bot will:
@@ -48,17 +49,16 @@ Note: When True, the bot will:
 
 - Message recruiters (if they accept free messages)
 - Skip all Easy Apply applications
-'''
-
+"""
 
 
 # \u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e InMail Preservation (CRITICAL) \u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c
 
 # Only message recruiters who accept free messages from anyone (preserves InMail credits)
-only_free_messages = True              # True or False, Note: True or False are case-sensitive
+only_free_messages = True  # True or False, Note: True or False are case-sensitive
 
 # Skip recruiters who require InMail (preserves your LinkedIn Premium InMail credits)
-skip_inmail_required = True            # True or False, Note: True or False are case-sensitive
+skip_inmail_required = True  # True or False, Note: True or False are case-sensitive
 
 
 # \u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e Message Templates \u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c
@@ -91,12 +91,12 @@ Best regards,
 """
 
 # Connection note template (short, under connection_note_max_chars)
-connection_note_template = """Hi {recruiter_name}, {personalized_intro} {why_interested} Thanks, {your_name}."""  
+connection_note_template = """Hi {recruiter_name}, {personalized_intro} {why_interested} Thanks, {your_name}."""
 
 # Max characters for connection note (LinkedIn limit is low; keep <= 380)
 connection_note_max_chars = 380
 
-'''
+"""
 Available template variables:
 - {recruiter_name}: Recruiter's first name or full name
 - {job_title}: Title of the job posting
@@ -107,21 +107,21 @@ Available template variables:
 - {personalized_intro}: AI-generated personalized introduction (if AI enabled)
 - {why_interested}: AI-generated reason for interest (if AI enabled)
 - {key_skills}: Your relevant skills from profile
-'''
+"""
 
 
 # \u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e AI-Powered Personalization \u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c
 
 # Use AI to personalize messages based on job description?
-use_ai_for_messages = True             # True or False, Note: True or False are case-sensitive
+use_ai_for_messages = True  # True or False, Note: True or False are case-sensitive
 
 # Level of AI personalization
-ai_personalization_level = "high"      # "low", "medium", "high"
-'''
+ai_personalization_level = "high"  # "low", "medium", "high"
+"""
 - "low": Basic job title and company name insertion
 - "medium": Add relevant skills matching from job description
 - "high": Full personalization with job-specific intro and interest explanation
-'''
+"""
 
 
 # \u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e Message History Tracking \u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c
@@ -133,20 +133,19 @@ message_history_file = "all excels/recruiter_messages_history.csv"
 # \u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e\u003e Testing and Safety \u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c\u003c
 
 # Dry run mode - generate messages but don't actually send them (for testing)
-dry_run_mode = False                   # True or False, Note: True or False are case-sensitive
+dry_run_mode = False  # True or False, Note: True or False are case-sensitive
 
 
 # AI Skill Extraction Config
 
 # Enable AI skill extraction from job descriptions?
-use_ai_skill_extraction = False         # True or False, Note: True or False are case-sensitive
+use_ai_skill_extraction = False  # True or False, Note: True or False are case-sensitive
 
 # You can add more skill extraction settings here in the future
 
 
-
 ############################################################################################################
-'''
+"""
 THANK YOU for using this tool 😊! Wishing you the best in your job hunt 🙌🏻!
 
 Sharing is caring! If you found this tool helpful, please share it with your peers 🥺. Your support keeps this project alive.
@@ -157,5 +156,5 @@ Your support, whether through donations big or small or simply spreading the wor
 
 Gratefully yours 🙏🏻,
 Sai Vignesh Golla
-'''
+"""
 ############################################################################################################

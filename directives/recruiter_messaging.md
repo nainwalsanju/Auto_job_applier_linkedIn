@@ -60,6 +60,29 @@ sequenceDiagram
 - **AI Failure**: Fall back to template messages if AI generation fails.
 - **Rate Limits**: Implement delays between messages.
 
+## Known LinkedIn UI Challenges (2026-01-26)
+
+### 1. Button Lookup by Name Fails
+**Problem**: LinkedIn splits names across multiple `<span>` elements with `aria-hidden`, so XPath like `.//*[contains(text(), 'John')]` fails.
+
+**Solution**: Use recruiter's **profile ID** (from `/in/xxxxx` URL) as primary anchor:
+```xpath
+//a[contains(@href, '/in/{recruiter_id}')]/ancestor::*[...][1]//button[...]
+```
+
+### 2. Recruiter Name Shows as "Unknown"
+**Problem**: Name extraction selectors were too specific for LinkedIn's varying markup.
+
+**Solution**: Multi-strategy name extraction:
+1. Profile link anchor text (most stable)
+2. Multiple CSS class patterns  
+3. Fallback: Parse from button's `aria-label` (e.g., "Message John Doe")
+
+### 3. Pre-click InMail Detection Limitations
+**Problem**: LinkedIn doesn't show InMail requirement until AFTER clicking the button.
+
+**Solution**: Post-click check for `msg-inmail-credits-display` class, then close modal if detected.
+
 ## Outputs
 - **Messages Sent**: Count of successful messages.
 - **CSV Log**: Detailed history in `all excels/recruiter_messages_history.csv`.

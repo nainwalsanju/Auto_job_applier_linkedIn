@@ -88,6 +88,80 @@ def log_action(action: str, element_info: str = "", success: bool = True):
     level = "INFO" if success else "ERROR"
     log_step(f"{status} {action}", element_info, level)
 
+
+class LoggedWebElement:
+    def __init__(self, element):
+        self._element = element
+
+    def __getattr__(self, name):
+        return getattr(self._element, name)
+    
+    @property
+    def wrapped_element(self):
+        '''Return the underlying Selenium WebElement for use with execute_script'''
+        return self._element
+
+    def click(self):
+        log_action("element.click")
+        return self._element.click()
+
+    def send_keys(self, *args, **kwargs):
+        log_action("element.send_keys", f"chars={sum(len(str(a)) for a in args)}")
+        return self._element.send_keys(*args, **kwargs)
+
+    def clear(self):
+        log_action("element.clear")
+        return self._element.clear()
+
+    def get_attribute(self, name):
+        log_action("element.get_attribute", f"name={name}")
+        return self._element.get_attribute(name)
+
+
+class LoggedWebDriver:
+    def __init__(self, driver):
+        self._driver = driver
+
+    def __getattr__(self, name):
+        return getattr(self._driver, name)
+
+    def get(self, url):
+        log_step("NAVIGATE", f"URL: {url}")
+        return self._driver.get(url)
+
+    def find_element(self, *args, **kwargs):
+        element = self._driver.find_element(*args, **kwargs)
+        try:
+            log_action("find_element", f"args={args}, kwargs={kwargs}")
+        except Exception:
+            pass
+        return LoggedWebElement(element)
+
+    def find_elements(self, *args, **kwargs):
+        elements = self._driver.find_elements(*args, **kwargs)
+        try:
+            log_action("find_elements", f"args={args}, kwargs={kwargs}")
+        except Exception:
+            pass
+        return [LoggedWebElement(elem) for elem in elements]
+
+    def execute_script(self, script, *args):
+        log_action("execute_script", f"script={script[:120]}")
+        # Unwrap any LoggedWebElement objects to their underlying Selenium elements
+        unwrapped_args = []
+        for arg in args:
+            if isinstance(arg, LoggedWebElement):
+                unwrapped_args.append(arg._element)
+            elif isinstance(arg, list):
+                unwrapped_args.append([a._element if isinstance(a, LoggedWebElement) else a for a in arg])
+            else:
+                unwrapped_args.append(arg)
+        return self._driver.execute_script(script, *unwrapped_args)
+
+    def switch_to_window(self, handle):
+        log_action("switch_to_window", f"handle={handle}")
+        return self._driver.switch_to.window(handle)
+
 def log_decision(decision: str, reason: str):
     '''Log a decision point (e.g., skip job, proceed with application)'''
     log_step(f"🔀 DECISION: {decision}", reason, level="INFO")

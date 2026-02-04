@@ -50,7 +50,7 @@ if use_ai_for_messages:
 
 # Global variables
 messages_sent_today = 0
-messaged_recruiters = set()  # Track recruiter IDs to avoid duplicates
+messaged_recruiters = set()  # Track recruiter IDs and action types to avoid duplicates
 
 
 def _ensure_modal_closed(driver: WebDriver) -> None:
@@ -205,13 +205,15 @@ def _ensure_modal_closed(driver: WebDriver) -> None:
     except Exception as e:
         print_lg(f"❌ Critical error in modal closing: {e}")
 
-    # Final check - log any remaining modals
+    # Final check - log any remaining VISIBLE modals only
     try:
-        remaining_modals = driver.find_elements(By.XPATH, "//div[contains(@class, 'artdeco-modal') or contains(@class, 'msg-overlay') or contains(@class, 'modal-backdrop')]")
-        if remaining_modals:
-            print_lg(f"⚠️ Warning: {len(remaining_modals)} modal(s) may still be present after cleanup attempts")
+        remaining_modals = driver.find_elements(By.XPATH, "//div[contains(@class, 'artdeco-modal') or contains(@class, 'msg-overlay-conversation-bubble--is-active') or contains(@class, 'modal-backdrop')]")
+        # Only count actually visible modals
+        visible_modals = [m for m in remaining_modals if m.is_displayed()]
+        if visible_modals:
+            print_lg(f"⚠️ Warning: {len(visible_modals)} visible modal(s) may still be present")
         else:
-            print_lg("✅ Modal cleanup completed successfully - no modals detected")
+            print_lg("✅ Modal cleanup completed successfully")
     except Exception as e:
         print_lg(f"Error checking for remaining modals: {e}")
 
@@ -317,17 +319,50 @@ def _extract_recruiter_from_section(driver: WebDriver, section: WebElement, sect
         recruiter_info['profile_link'] = ""
         recruiter_info['recruiter_id'] = "unknown"
 
-    # STEP 2: Find name
-    try:
-        if section_type == 'hiring_team':
-            name_element = section.find_element(By.XPATH,
-                ".//span[contains(@class, 'jobs-poster__name')]")
-        else:  # connections section
-            name_element = section.find_element(By.XPATH,
-                ".//strong[contains(@class, 'EntityPhoto-circle-3-stackedFacepile')]")
-        recruiter_info['name'] = name_element.text.strip()
-    except NoSuchElementException:
-        recruiter_info['name'] = "Unknown"
+    # STEP 2: Find name - ROBUST EXTRACTION
+    # LinkedIn splits names across nested spans with aria-hidden, so we try multiple strategies
+    recruiter_info['name'] = "Unknown"
+    
+    name_selectors = [
+        # Priority 1: Get text from profile link anchor (most stable)
+        ".//a[contains(@href, '/in/')]",
+        # Priority 2: Hiring team specific selectors
+        ".//span[contains(@class, 'jobs-poster__name')]",
+        ".//div[contains(@class, 'hirer-card__hirer-information')]//span[contains(@class, 'text-heading')]",
+        # Priority 3: Entity lockup title (common in modals/cards)
+        ".//div[contains(@class, 'artdeco-entity-lockup__title')]//strong",
+        ".//div[contains(@class, 'artdeco-entity-lockup__title')]//span[contains(@class, 'artdeco-entity-lockup__title')]",
+        # Priority 4: Generic strong/heading elements
+        ".//strong",
+        ".//span[@aria-hidden='true']",
+    ]
+    
+    for selector in name_selectors:
+        try:
+            name_element = section.find_element(By.XPATH, selector)
+            name_text = name_element.text.strip()
+            # Validate: names should be at least 2 chars, not contain obvious non-name patterns
+            if name_text and len(name_text) >= 2 and not name_text.startswith('http'):
+                recruiter_info['name'] = name_text.split('\n')[0].strip()  # Take first line only
+                break
+        except NoSuchElementException:
+            continue
+    
+    # Fallback: Try extracting name from button aria-label if still Unknown
+    if recruiter_info['name'] == "Unknown":
+        try:
+            # Look for Message/Connect button aria-label like "Message John Doe"
+            btn = section.find_element(By.XPATH, 
+                ".//button[contains(@aria-label, 'Message') or contains(@aria-label, 'Connect')]")
+            aria_label = btn.get_attribute('aria-label') or ""
+            # Extract name by removing "Message " or "Connect " prefix
+            for prefix in ['Message ', 'Connect ']:
+                if aria_label.startswith(prefix):
+                    recruiter_info['name'] = aria_label[len(prefix):].strip()
+                    print_lg(f"📝 Extracted name from button aria-label: {recruiter_info['name']}")
+                    break
+        except:
+            pass
 
     # STEP 3: Find title
     try:
@@ -557,7 +592,9 @@ def check_message_capability(driver: WebDriver, section: WebElement) -> dict:
         'can_message': False,
         'is_free_message': False,
         'message_type': 'unavailable',
-        'button_type': 'none'
+        'button_type': 'none',
+        'has_message_button': False,
+        'has_connect_button': False
     }
 
     try:
@@ -569,6 +606,7 @@ def check_message_capability(driver: WebDriver, section: WebElement) -> dict:
             message_button = section.find_element(By.XPATH,
                 ".//button[contains(normalize-space(.), 'Message') or contains(@aria-label, 'Message')]")
             result['can_message'] = True
+            result['has_message_button'] = True
         except NoSuchElementException:
             pass
             
@@ -576,6 +614,7 @@ def check_message_capability(driver: WebDriver, section: WebElement) -> dict:
             connect_button = section.find_element(By.XPATH,
                 ".//button[contains(normalize-space(.), 'Connect') or contains(@aria-label, 'Connect')]")
             result['can_message'] = True
+            result['has_connect_button'] = True
         except NoSuchElementException:
             pass
             
@@ -654,6 +693,15 @@ def check_message_capability(driver: WebDriver, section: WebElement) -> dict:
     except Exception as e:
         print_lg(f"Error checking message capability: {e}")
         return result
+
+
+def _trim_to_limit(text: str, limit: int) -> str:
+    if limit <= 0:
+        return ""
+    if len(text) <= limit:
+        return text
+    trimmed = text[: max(0, limit - 3)].rstrip()
+    return f"{trimmed}..."
 
 
 def generate_personalized_message(
@@ -744,13 +792,72 @@ Company: {company_name}"""
 
     # Ensure message is within LinkedIn limits
     # Subject: 200 chars, Body: 1900 chars for regular messages
-    if len(subject) > 200:
-        subject = subject[:197] + "..."
-
-    if len(body) > 1900:
-        body = body[:1897] + "..."
+    subject = _trim_to_limit(subject, 200)
+    body = _trim_to_limit(body, 1900)
 
     return subject, body
+
+
+def generate_connection_note(
+    aiClient,
+    recruiter_info: dict,
+    job_description: str,
+    job_title: str,
+    company_name: str,
+) -> str:
+    recruiter_name = recruiter_info.get('name', 'Recruiter').split()[0]
+    your_name = f"{first_name} {last_name}"
+    personalized_intro = ""
+    why_interested = ""
+
+    if use_ai_for_messages and use_AI and aiClient:
+        try:
+            intro_prompt = f"""Write a very short friendly intro (1 sentence, <= 20 words) for a LinkedIn connection note.
+
+Job Title: {job_title}
+Company: {company_name}
+Job Description: {job_description[:800]}
+Candidate Experience: {years_of_experience} years in backend development with Java"""
+
+            if ai_provider.lower() == "openai":
+                personalized_intro = ai_answer_question(aiClient, intro_prompt, question_type="text")
+            elif ai_provider.lower() == "deepseek":
+                personalized_intro = deepseek_answer_question(aiClient, intro_prompt, question_type="text")
+            elif ai_provider.lower() == "gemini":
+                personalized_intro = gemini_answer_question(aiClient, intro_prompt, question_type="text")
+
+            interest_prompt = f"""Write 1 short sentence (<= 20 words) explaining interest in this role/company for a LinkedIn connection note.
+
+Job Title: {job_title}
+Company: {company_name}"""
+
+            if ai_provider.lower() == "openai":
+                why_interested = ai_answer_question(aiClient, interest_prompt, question_type="text")
+            elif ai_provider.lower() == "deepseek":
+                why_interested = deepseek_answer_question(aiClient, interest_prompt, question_type="text")
+            elif ai_provider.lower() == "gemini":
+                why_interested = gemini_answer_question(aiClient, interest_prompt, question_type="text")
+
+            personalized_intro = personalized_intro.strip().replace("\n", " ")
+            why_interested = why_interested.strip().replace("\n", " ")
+        except Exception as e:
+            print_lg(f"Failed to generate AI connection note personalization: {e}")
+            personalized_intro = ""
+            why_interested = ""
+
+    note = connection_note_template.format(
+        recruiter_name=recruiter_name,
+        job_title=job_title,
+        company_name=company_name,
+        your_name=your_name,
+        years_of_experience=years_of_experience,
+        personalized_intro=personalized_intro,
+        why_interested=why_interested,
+        key_skills="Java, Spring Boot, Microservices",
+    ).strip()
+
+    note = " ".join(note.split())
+    return _trim_to_limit(note, connection_note_max_chars)
 
 
 def send_message_to_recruiter(
@@ -852,6 +959,7 @@ def send_message_to_recruiter(
     try:
         current_name = recruiter_info.get('name', '').split()[0]
         section_type = recruiter_info.get('section', '')
+        original_button_type = recruiter_info.get('button_type')
         
         # SPECIAL CASE: Modal connections require re-opening the modal first
         if section_type == 'modal_connections':
@@ -902,50 +1010,98 @@ def send_message_to_recruiter(
         # we search for a button that shares a common ancestor with the recruiter's name.
         
         print_lg(f"🔍 Searching for button anchored to name: '{current_name}'")
-        search_context = driver # Use driver to avoid stale element issues
         
-        # XPaths that find a button inside a container that ALSO contains the recruiter's name
-        # This guarantees we click the button for THIS recruiter, not another one on the page
-        btn_xpaths = []
-        name_clean = current_name
+        # STRATEGY: Use recruiter_id from profile_link to find button (most reliable)
+        # LinkedIn names can be split across spans making text matching fragile
+        recruiter_id = recruiter_info.get('recruiter_id', '')
+        profile_link = recruiter_info.get('profile_link', '')
+        button_type = recruiter_info.get('button_type', 'message')
         
-        if recruiter_info['button_type'] == 'message':
-            btn_xpaths = [
-                # 0. Modal-specific: Find button within the connections modal (for modal_connections)
-                f"//div[contains(@class, 'job-details-connections-modal')]//div[contains(@class, 'artdeco-entity-lockup') and .//*[contains(text(), '{name_clean}')]]//button[.//span[text()='Message']]",
-                f"//div[@role='dialog']//div[contains(@class, 'artdeco-entity-lockup') and .//*[contains(text(), '{name_clean}')]]//button[.//span[text()='Message']]",
-                # 1. Correct Structure: Button is sibling's child (entry-point sibling to hirer-card__hirer-information)
-                # Find the container div that has BOTH the name text and a button descendant
-                f"//div[contains(@class, 'display-flex') and .//*[contains(text(), '{name_clean}')]]//button[.//span[contains(text(), 'Message')]]",
-                f"//div[contains(@class, 'display-flex') and .//*[contains(text(), '{name_clean}')]]//button[contains(normalize-space(.), 'Message')]",
-                # 2. "Meet the hiring team" Section Fallback (Most Reliable)
-                "//section[.//h2[contains(text(),'Meet the hiring team')]]//button[.//span[contains(text(), 'Message')]]",
-                "//section[.//h2[contains(text(),'Meet the hiring team')]]//button[contains(normalize-space(.), 'Message')]",
-                # 3. Artdeco card fallback
-                f"//div[contains(@class,'artdeco-card') and .//*[contains(text(), '{name_clean}')]]//button[contains(normalize-space(.), 'Message')]",
-                # 4. Generic artdeco-entity-lockup (common in modals)
-                f"//div[contains(@class, 'artdeco-entity-lockup') and .//*[contains(text(), '{name_clean}')]]//button[.//span[text()='Message']]",
-            ]
-        elif recruiter_info['button_type'] == 'connect':
-            btn_xpaths = [
-                 f"//div[contains(@class, 'display-flex') and .//*[contains(text(), '{name_clean}')]]//button[.//span[contains(text(), 'Connect')]]",
-                 f"//div[contains(@class, 'display-flex') and .//*[contains(text(), '{name_clean}')]]//button[contains(normalize-space(.), 'Connect')]",
-                 "//section[.//h2[contains(text(),'Meet the hiring team')]]//button[.//span[contains(text(), 'Connect')]]",
-                 "//section[.//h2[contains(text(),'Meet the hiring team')]]//button[contains(normalize-space(.), 'Connect')]",
-            ]
-        else:
-             btn_xpaths = ["//section[.//h2[contains(text(),'Meet the hiring team')]]//button[contains(normalize-space(.), 'Message')]"]
-
         action_button = None
-        for path in btn_xpaths:
-            try:
-                action_button = driver.find_element(By.XPATH, path)
-                print_lg(f"✅ Found button with anchored strategy: {path[:40]}...")
-                break
-            except: continue
+        
+        # APPROACH 1: Find button via profile link/recruiter_id (MOST RELIABLE)
+        # This finds the card container containing the profile link, then finds the button within it
+        if recruiter_id and recruiter_id != "unknown":
+            profile_based_xpaths = []
             
+            if button_type == 'message':
+                profile_based_xpaths = [
+                    # Find button in same container as profile link
+                    f"//a[contains(@href, '/in/{recruiter_id}')]/ancestor::*[contains(@class,'artdeco-entity-lockup') or contains(@class,'hirer-card') or contains(@class,'display-flex')][1]//button[contains(@aria-label, 'Message') or .//span[normalize-space()='Message'] or contains(normalize-space(.), 'Message')]",
+                    # Hiring team section specifically
+                    f"//section[.//h2[contains(text(),'Meet the hiring team')]]//a[contains(@href, '/in/{recruiter_id}')]/ancestor::div[1]//button[contains(@aria-label, 'Message') or contains(normalize-space(.), 'Message')]",
+                    # Modal connections
+                    f"//div[@role='dialog']//a[contains(@href, '/in/{recruiter_id}')]/ancestor::*[contains(@class,'artdeco-entity-lockup')][1]//button[contains(normalize-space(.), 'Message')]",
+                ]
+            elif button_type == 'connect':
+                profile_based_xpaths = [
+                    f"//a[contains(@href, '/in/{recruiter_id}')]/ancestor::*[contains(@class,'artdeco-entity-lockup') or contains(@class,'hirer-card') or contains(@class,'display-flex')][1]//button[contains(@aria-label, 'Connect') or .//span[normalize-space()='Connect'] or contains(normalize-space(.), 'Connect')]",
+                ]
+            
+            for xpath in profile_based_xpaths:
+                try:
+                    action_button = driver.find_element(By.XPATH, xpath)
+                    print_lg(f"✅ Found button via profile ID: /in/{recruiter_id}")
+                    break
+                except:
+                    continue
+        
+        # APPROACH 2: Name-based matching (fallback, less reliable due to split spans)
         if not action_button:
-             raise Exception(f"Could not find '{recruiter_info['button_type']}' button anchored to '{name_clean}'")
+            name_clean = current_name
+            name_based_xpaths = []
+            
+            if button_type == 'message':
+                name_based_xpaths = [
+                    # Modal-specific
+                    f"//div[contains(@class, 'job-details-connections-modal')]//div[contains(., '{name_clean}')]//button[contains(normalize-space(.), 'Message')]",
+                    f"//div[@role='dialog']//div[contains(., '{name_clean}')]//button[contains(normalize-space(.), 'Message')]",
+                    # Hiring team section - find by section context, not name
+                    "//section[.//h2[contains(text(),'Meet the hiring team')]]//button[contains(@aria-label, 'Message') or contains(normalize-space(.), 'Message')]",
+                    # Generic containers with name
+                    f"//*[contains(., '{name_clean}') and (contains(@class, 'artdeco-entity-lockup') or contains(@class, 'hirer-card') or contains(@class, 'display-flex'))]//button[contains(normalize-space(.), 'Message')]",
+                ]
+            elif button_type == 'connect':
+                name_based_xpaths = [
+                    "//section[.//h2[contains(text(),'Meet the hiring team')]]//button[contains(@aria-label, 'Connect') or contains(normalize-space(.), 'Connect')]",
+                    f"//*[contains(., '{name_clean}') and (contains(@class, 'artdeco-entity-lockup') or contains(@class, 'hirer-card'))]//button[contains(normalize-space(.), 'Connect')]",
+                ]
+            
+            for xpath in name_based_xpaths:
+                try:
+                    action_button = driver.find_element(By.XPATH, xpath)
+                    print_lg(f"✅ Found button via name-based fallback")
+                    break
+                except:
+                    continue
+        
+        # APPROACH 3: ARIA-label direct lookup (uses button's own label)
+        if not action_button:
+            # Try finding button by aria-label containing the recruiter name
+            aria_xpaths = []
+            if button_type == 'message':
+                aria_xpaths = [
+                    f"//button[contains(@aria-label, 'Message {current_name}')]",
+                    f"//button[contains(@aria-label, 'Message') and contains(@aria-label, '{current_name.split()[0]}')]",
+                    # Last resort: any visible Message button in the hiring team / connections area
+                    "//div[contains(@class, 'job-details-people-who-can-help') or contains(@class, 'hirer-card')]//button[contains(normalize-space(.), 'Message')]",
+                ]
+            elif button_type == 'connect':
+                aria_xpaths = [
+                    f"//button[contains(@aria-label, 'Connect') and contains(@aria-label, '{current_name.split()[0]}')]",
+                    "//div[contains(@class, 'hirer-card')]//button[contains(normalize-space(.), 'Connect')]",
+                ]
+            
+            for xpath in aria_xpaths:
+                try:
+                    action_button = driver.find_element(By.XPATH, xpath)
+                    print_lg(f"✅ Found button via aria-label lookup")
+                    break
+                except:
+                    continue
+
+        if not action_button:
+             raise Exception(f"Could not find '{button_type}' button for recruiter '{current_name}' (ID: {recruiter_id})")
 
         print_lg(f"🖱️  Clicking {recruiter_info['button_type']} button (Safe Scope)...")
         
@@ -979,12 +1135,34 @@ def send_message_to_recruiter(
                 # Does logic allow sending without note? Only if 'Add a note' is missing (already open?)
                 print_lg("ℹ️ 'Add a note' button not found, checking if text area is already visible")
 
+            # Generate connection note (personalized) if not provided
+            aiClient = message_init_data.get('aiClient')
+            job_description = message_init_data.get('job_description', '')
+            job_title = message_init_data.get('job_title', '')
+            company_name = message_init_data.get('company_name', '')
+            message_body = message_init_data.get('message_body', '')
+            if not message_body:
+                message_body = generate_connection_note(
+                    aiClient=aiClient,
+                    recruiter_info=recruiter_info,
+                    job_description=job_description,
+                    job_title=job_title,
+                    company_name=company_name,
+                )
+
             # Type message
             print_lg("✍️  Typing connection note...")
             try:
                 note_area = driver.find_element(By.ID, "custom-message")
+                note_area.clear()
                 note_area.send_keys(message_body)
-                buffer(1)
+                buffer(0.3)
+                entered_text = note_area.get_attribute("value") or ""
+                if len(entered_text.strip()) < len(message_body) * 0.5:
+                    print_lg("⚠️ Note field insert check failed; retrying with JS + send_keys")
+                    driver.execute_script("arguments[0].value = '';", note_area)
+                    note_area.send_keys(message_body)
+                    buffer(0.3)
             except NoSuchElementException:
                 return False, "Could not find custom message text area for connection"
             
@@ -1006,6 +1184,17 @@ def send_message_to_recruiter(
             buffer(2)
             
             messages_sent_today += 1
+
+            action_type = recruiter_info.get('button_type', 'connect')
+            recruiter_key = f"{recruiter_info.get('recruiter_id', 'unknown')}:{action_type}"
+            messaged_recruiters.add(recruiter_key)
+
+            # If a Message button also exists, attempt to message after connecting
+            if recruiter_info.get('has_message_button'):
+                print_lg("🔁 Connect sent; attempting Message since button also exists")
+                recruiter_info['button_type'] = 'message'
+                return send_message_to_recruiter(driver, recruiter_info, message_init_data)
+
             return True, "Connection request sent with note"
             
         except Exception as e:
@@ -1115,114 +1304,149 @@ def send_message_to_recruiter(
     # STEP 4.5: POST-CLICK InMail Detection
     # Some recruiters show "Message" button but it actually requires InMail credits.
     # We detect this AFTER the click by checking for InMail-specific elements in the modal.
+    # CRITICAL: Only check VISIBLE elements in active message bubbles, not the entire page!
     print_lg(f"🔍 Checking if modal requires InMail credits...")
     is_inmail_modal = False
+    is_confirmed_free = False
     
-    try:
-        # Check for InMail-specific indicators in the opened modal
-        inmail_indicators = [
-            # InMail credits display section (Most reliable)
-            "//*[contains(@class,'msg-inmail-credits-display')]",
-            # Text specifically mentioning InMail credits usage
-            "//*[contains(text(),'InMail credit')]",
-            "//*[contains(text(),'InMail credits')]",
-            # Premium badge combined with non-free text
-            "//section[contains(@class,'msg-inmail')]//svg[@aria-label='Premium']"
-        ]
+    # For 1st degree connections, skip InMail check entirely - they are always free
+    if recruiter_info.get('connection_degree') == '1st':
+        print_lg(f"✅ Skipping InMail check - {recruiter_info['name']} is 1st degree connection (always free)")
+        is_confirmed_free = True
+    elif recruiter_info.get('is_free_message', False):
+        print_lg(f"✅ Skipping InMail check - {recruiter_info['name']} was pre-verified as free message")
+        is_confirmed_free = True
+    else:
+        # NOT a 1st degree connection and NOT pre-verified as free
+        # We need to be STRICT here - only allow if we find POSITIVE proof it's free
+        print_lg(f"⚠️ {recruiter_info['name']} is NOT 1st degree - checking for InMail indicators...")
         
-        for indicator in inmail_indicators:
-            try:
-                driver.find_element(By.XPATH, indicator)
-                is_inmail_modal = True
-                print_lg(f"⚠️ InMail detected via: {indicator[:60]}...")
-                break
-            except NoSuchElementException:
-                continue
-        
-        # Check if it's explicitly a "Free to message" (Open Profile) to override InMail detection
-        if is_inmail_modal:
+        try:
+            # Check for InMail indicators in the modal
+            inmail_indicators = [
+                # InMail credits display section
+                "//div[contains(@class,'msg-overlay')]//div[contains(@class,'msg-inmail')]",
+                "//div[contains(@class,'msg-overlay')]//span[contains(text(),'InMail')]",
+                "//div[contains(@class,'msg-form')]//div[contains(@class,'inmail')]",
+                # Text mentioning InMail credits
+                "//*[contains(text(),'InMail credit')]",
+                "//*[contains(text(),'InMail credits')]",
+                # Subject line field (InMail requires subject, regular messages don't)
+                "//input[@name='subject' or contains(@placeholder,'Subject')]",
+                "//div[contains(@class,'msg-form')]//input[contains(@aria-label,'Subject')]"
+            ]
+            
+            for indicator in inmail_indicators:
+                try:
+                    elems = driver.find_elements(By.XPATH, indicator)
+                    for elem in elems:
+                        if elem.is_displayed():
+                            is_inmail_modal = True
+                            print_lg(f"⚠️ InMail detected via VISIBLE element: {indicator[:60]}...")
+                            break
+                    if is_inmail_modal:
+                        break
+                except:
+                    continue
+            
+            # ADDITIONAL CHECK: Look for "Free" or "Open Profile" indicators to confirm it's free
             free_indicators = [
-                "//*[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'free to message')]",
-                "//*[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'free message')]", 
+                "//*[contains(@class,'msg-overlay')]//*[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'free')]",
                 "//*[contains(text(),'Open Profile')]",
-                "//*[contains(@class,'msg-inmail-credits-display') and contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'free')]"
+                "//*[contains(text(),'open profile')]",
             ]
             
             for free_ind in free_indicators:
                 try:
-                    driver.find_element(By.XPATH, free_ind)
-                    is_inmail_modal = False
-                    print_lg(f"✅ Found Free indicator via: {free_ind} - Overriding InMail detected status (It is Free)")
-                    break
+                    elems = driver.find_elements(By.XPATH, free_ind)
+                    for elem in elems:
+                        if elem.is_displayed():
+                            is_confirmed_free = True
+                            is_inmail_modal = False
+                            print_lg(f"✅ Found FREE indicator - confirmed as free message")
+                            break
+                    if is_confirmed_free:
+                        break
                 except:
                     continue
+            
+            # SAFETY: If pre-click said NOT free AND we didn't find positive proof it's free, BLOCK IT
+            if not is_confirmed_free and not is_inmail_modal:
+                # Pre-click detection said is_free_message=False, but we couldn't detect InMail indicators
+                # This could mean LinkedIn changed their UI - be CONSERVATIVE and block
+                print_lg(f"⚠️ SAFETY CHECK: Pre-click detection marked as NOT free, no positive free confirmation found")
+                is_inmail_modal = True  # Treat as InMail to be safe
         
-        if is_inmail_modal:
-            print_lg(f"🚫 POST-CLICK InMail DETECTION: Modal requires InMail credits!")
-             # CAPTURE DEBUG DATA FOR THIS FAILURE
-            try:
-                timestamp = os.environ.get('Safe_Current_Time', 'unknown_time').replace(':', '')
-                debug_file = f"debug_html_dumps/INMAIL_BLOCK_{timestamp}.html"
-                with open(debug_file, "w", encoding="utf-8") as f:
-                    f.write(driver.page_source)
-                print_lg(f"📸 Saved INMAIL VALIDATION FAILURE dump to: {debug_file}")
-            except Exception as e:
-                print_lg(f"Could not save debug dump: {e}")
+        except Exception as e:
+            print_lg(f"⚠️ Post-click InMail check error: {e}")
+            # On error, if pre-click said not free, be conservative
+            if not recruiter_info.get('is_free_message', False):
+                is_inmail_modal = True
+    
+    # Handle InMail modal - close it and skip
+    if is_inmail_modal:
+        print_lg(f"🚫 POST-CLICK InMail DETECTION: Modal requires InMail credits!")
+        # CAPTURE DEBUG DATA FOR THIS FAILURE
+        try:
+            timestamp = os.environ.get('Safe_Current_Time', 'unknown_time').replace(':', '')
+            debug_file = f"debug_html_dumps/INMAIL_BLOCK_{timestamp}.html"
+            with open(debug_file, "w", encoding="utf-8") as f:
+                f.write(driver.page_source)
+            print_lg(f"📸 Saved INMAIL VALIDATION FAILURE dump to: {debug_file}")
+        except Exception as e:
+            print_lg(f"Could not save debug dump: {e}")
 
-            # Close this InMail modal before returning - try multiple methods
-            modal_closed = False
-            
-            # Try multiple close button selectors
-            close_button_xpaths = [
-                # Close button by aria-label
-                "//button[@aria-label='Close your draft conversation']",
-                # Close button with close icon
-                "//button[contains(@class,'msg-overlay-bubble-header__control')]//*[contains(@data-test-icon,'close')]/..",
-                # Any close button in message header
-                "//button[contains(@class,'msg-overlay-bubble-header__control') and .//span[contains(text(),'Close')]]",
-                # Generic close with X icon in overlay
-                "//*[contains(@class,'msg-overlay')]//button[.//*[contains(@data-test-icon,'close')]]"
-            ]
-            
-            for close_xpath in close_button_xpaths:
-                try:
-                    close_btn = driver.find_element(By.XPATH, close_xpath)
-                    close_btn.click()
-                    buffer(0.5)
-                    print_lg(f"✅ Closed InMail modal via: {close_xpath[:50]}...")
-                    modal_closed = True
-                    break
-                except:
-                    continue
-            
-            # JavaScript fallback if button clicks didn't work
-            if not modal_closed:
-                try:
-                    driver.execute_script("""
-                        var modals = document.querySelectorAll('.msg-overlay-conversation-bubble, .msg-inmail-compose-form-v2');
-                        modals.forEach(function(m) { 
-                            var closeBtn = m.querySelector('button[data-test-icon="close-small"], button[aria-label*="Close"]');
-                            if(closeBtn) closeBtn.click();
-                        });
-                    """)
-                    buffer(0.5)
-                    print_lg("✅ Closed InMail modal via JavaScript")
-                    modal_closed = True
-                except Exception as js_err:
-                    print_lg(f"⚠️ JS close also failed: {js_err}")
-            
-            if not modal_closed:
-                print_lg("⚠️ Could not close InMail modal - will be cleaned up by next modal check")
-            
-            # Handle new window case
-            if is_new_window and messaging_window_handle:
-                driver.close()
-                driver.switch_to.window(list(pre_click_handles)[0])
-            
-            return False, "SKIPPED: InMail required (detected post-click in modal)"
-            
-    except Exception as e:
-        print_lg(f"⚠️ Post-click InMail check error (continuing): {e}")
+        # Close this InMail modal before returning - try multiple methods
+        modal_closed = False
+        
+        # Try multiple close button selectors
+        close_button_xpaths = [
+            # Close button by aria-label
+            "//button[@aria-label='Close your draft conversation']",
+            # Close button with close icon
+            "//button[contains(@class,'msg-overlay-bubble-header__control')]//*[contains(@data-test-icon,'close')]/..",
+            # Any close button in message header
+            "//button[contains(@class,'msg-overlay-bubble-header__control') and .//span[contains(text(),'Close')]]",
+            # Generic close with X icon in overlay
+            "//*[contains(@class,'msg-overlay')]//button[.//*[contains(@data-test-icon,'close')]]"
+        ]
+        
+        for close_xpath in close_button_xpaths:
+            try:
+                close_btn = driver.find_element(By.XPATH, close_xpath)
+                close_btn.click()
+                buffer(0.5)
+                print_lg(f"✅ Closed InMail modal via: {close_xpath[:50]}...")
+                modal_closed = True
+                break
+            except:
+                continue
+        
+        # JavaScript fallback if button clicks didn't work
+        if not modal_closed:
+            try:
+                driver.execute_script("""
+                    var modals = document.querySelectorAll('.msg-overlay-conversation-bubble, .msg-inmail-compose-form-v2');
+                    modals.forEach(function(m) { 
+                        var closeBtn = m.querySelector('button[data-test-icon="close-small"], button[aria-label*="Close"]');
+                        if(closeBtn) closeBtn.click();
+                    });
+                """)
+                buffer(0.5)
+                print_lg("✅ Closed InMail modal via JavaScript")
+                modal_closed = True
+            except Exception as js_err:
+                print_lg(f"⚠️ JS close also failed: {js_err}")
+        
+        if not modal_closed:
+            print_lg("⚠️ Could not close InMail modal - will be cleaned up by next modal check")
+        
+        # Handle new window case
+        if is_new_window and messaging_window_handle:
+            driver.close()
+            driver.switch_to.window(list(pre_click_handles)[0])
+        
+        return False, "SKIPPED: InMail required (detected post-click in modal)"
     
     print_lg(f"✅ Modal is FREE message - no InMail credits required")
     
@@ -1244,14 +1468,24 @@ def send_message_to_recruiter(
         message_body = message_init_data.get('message_body', '')
         
         if not message_body:
-             message_subject, message_body = generate_personalized_message(
-                aiClient=aiClient,
-                recruiter_info=recruiter_info,
-                job_description=job_description,
-                job_title=job_title,
-                company_name=company_name,
-                job_link=job_link
-             )
+             if recruiter_info.get('button_type') == 'connect':
+                 message_body = generate_connection_note(
+                    aiClient=aiClient,
+                    recruiter_info=recruiter_info,
+                    job_description=job_description,
+                    job_title=job_title,
+                    company_name=company_name,
+                 )
+                 message_subject = ""
+             else:
+                 message_subject, message_body = generate_personalized_message(
+                    aiClient=aiClient,
+                    recruiter_info=recruiter_info,
+                    job_description=job_description,
+                    job_title=job_title,
+                    company_name=company_name,
+                    job_link=job_link
+                 )
         
         # Try multiple selectors for message body field (LinkedIn UI varies)
         msg_body = None
@@ -1395,7 +1629,9 @@ def send_message_to_recruiter(
             print_lg(f"⚠️ Message clicked send for {recruiter_info['name']} but modal still visible")
         
         messages_sent_today += 1
-        messaged_recruiters.add(recruiter_info['recruiter_id'])
+        action_type = recruiter_info.get('button_type', 'message')
+        recruiter_key = f"{recruiter_info.get('recruiter_id', 'unknown')}:{action_type}"
+        messaged_recruiters.add(recruiter_key)
         
         return True, ""
         
@@ -1525,13 +1761,14 @@ def check_daily_message_limit() -> bool:
     return False
 
 
-def should_skip_recruiter(recruiter_info: dict, job_id: str, already_applied: bool) -> tuple[bool, str]:
+def should_skip_recruiter(recruiter_info: dict, job_id: str, already_applied: bool, action_type: str = "message") -> tuple[bool, str]:
     '''
     Determines if recruiter should be skipped.
     Returns (should_skip: bool, reason: str)
     '''
     # Check if already messaged this recruiter
-    if recruiter_info['recruiter_id'] in messaged_recruiters:
+    recruiter_key = f"{recruiter_info.get('recruiter_id', 'unknown')}:{action_type}"
+    if recruiter_key in messaged_recruiters:
         return True, "Already messaged this recruiter today"
 
     # Check if already applied to job
@@ -1548,8 +1785,8 @@ def should_skip_recruiter(recruiter_info: dict, job_id: str, already_applied: bo
     if check_daily_message_limit():
         return True, "Daily message limit reached"
 
-    # Check if can message at all
+    # Check if can message or connect at all
     if not recruiter_info['can_message']:
-        return True, "No message button available"
+        return True, "No message or connect button available"
 
     return False, ""

@@ -1,84 +1,102 @@
-'''
+"""
 Messaging Utility for LinkedIn
 Standalone tool to send personalized messages to recruiters and connections.
 
 Author: Auto Job Applier Team
-'''
+"""
 
 # Imports
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 import time
 from datetime import datetime
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
+# Add project root to path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from config.secrets import username, password, ai_provider, use_AI
 from config.settings import *
 from config.recruiter_messaging import *
-from modules.open_chrome import *
 from modules.helpers import print_lg, buffer
 from modules.recruiter_messenger import (
     generate_personalized_message,
     send_message_to_recruiter,
     track_sent_message,
-    check_daily_message_limit
+    check_daily_message_limit,
 )
 
-# Import AI conditionally
-if use_AI:
-    if ai_provider.lower() == "openai":
-        from modules.ai.openaiConnections import ai_create_openai_client
-    elif ai_provider.lower() == "deepseek":
-        from modules.ai.deepseekConnections import deepseek_create_client
-    elif ai_provider.lower() == "gemini":
-        from modules.ai.geminiConnections import gemini_create_client
+# Global tracker
+messages_sent_today = 0
 
-def try_linkText(driver, text):
+
+def setup_browser():
+    """
+    Explicit browser setup with error handling.
+    Returns (driver, wait, actions) or (None, None, None) if setup fails.
+    """
     try:
-        return driver.find_element(By.LINK_TEXT, text)
+        print_lg("Initializing browser for messaging utility...")
+        # Import browser setup modules
+        # Note: modules.open_chrome executes setup on import
+        from modules.open_chrome import driver, wait, actions
+
+        if driver is None:
+            raise Exception("Driver initialization failed")
+
+        print_lg("Browser setup successful")
+        return driver, wait, actions
+    except Exception as e:
+        print_lg(f"Failed to setup browser: {e}")
+        return None, None, None
+
+
+def try_find_xp(driver, xpath, timeout=1):
+    """Try to find an element by XPath with a timeout."""
+    try:
+        return WebDriverWait(driver, timeout).until(
+            EC.presence_of_element_located((By.XPATH, xpath))
+        )
     except:
         return None
 
-def try_xp(driver, xpath, timeout=1):
-    try:
-        WebDriverWait(driver, timeout).until(EC.presence_of_element_located((By.XPATH, xpath)))
-        return driver.find_element(By.XPATH, xpath)
-    except:
-        return None
 
 def is_logged_in_LN(driver) -> bool:
-    """Check if logged into LinkedIn"""
-    print_lg("Checking login status...")
-    current_url = driver.current_url
-    print_lg(f"Current URL: {current_url}")
-    if driver.current_url == "https://www.linkedin.com/feed/":
-        print_lg("Login detected: On feed page.")
-        return True
-    if try_linkText(driver, "Sign in"):
-        print_lg("Login check failed: Found 'Sign in' link.")
-        return False
-    if try_xp(driver, '//button[@type="submit" and contains(text(), "Sign in")]'):
-        print_lg("Login check failed: Found 'Sign in' button.")
-        return False
-    if try_linkText(driver, "Join now"):
-        print_lg("Login check failed: Found 'Join now' link.")
-        return False
-    print_lg("Didn't find Sign in link/button, assuming user is logged in!")
-    return True
-
-def login_LN(driver) -> bool:
-    """Login to LinkedIn"""
+    """Check if currently logged into LinkedIn."""
     try:
+        if "linkedin.com/feed" in driver.current_url:
+            return True
+
+        # Check for common login elements
+        if driver.find_elements(By.ID, "global-nav-typeahead"):
+            return True
+
+        # Check if login button is present
+        if driver.find_elements(By.XPATH, "//button[contains(text(), 'Sign in')]"):
+            return False
+
+        return False
+    except:
+        return False
+
+
+def login_with_timeout(driver, timeout=120):
+    """
+    Attempts automated login, then waits for manual intervention with timeout.
+    """
+    if is_logged_in_LN(driver):
+        print_lg("Already logged in.")
+        return True
+
+    try:
+        print_lg("Attempting automated login...")
         driver.get("https://www.linkedin.com/login")
-        WebDriverWait(driver, 10).until(
+
+        username_field = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.ID, "username"))
         )
-
-        username_field = driver.find_element(By.ID, "username")
         password_field = driver.find_element(By.ID, "password")
 
         username_field.send_keys(username)
@@ -87,205 +105,168 @@ def login_LN(driver) -> bool:
         login_button = driver.find_element(By.XPATH, "//button[@type='submit']")
         login_button.click()
 
-        # Wait for login to complete
-        time.sleep(5)  # Initial wait for login attempt
+        time.sleep(5)  # Wait for redirect
 
         if is_logged_in_LN(driver):
-            print_lg("Login successful!")
+            print_lg("Automated login successful!")
             return True
-        else:
-            print_lg("Login appears to have failed or is taking longer. Please complete the login manually in the browser if needed.")
-            input("Press Enter after confirming login is complete...")
-            if is_logged_in_LN(driver):
-                print_lg("Login confirmed!")
-                return True
-            else:
-                print_lg("Login still not confirmed.")
-                return False
 
     except Exception as e:
-        print_lg(f"Login failed: {e}")
-        return False
+        print_lg(f"Automated login failed: {e}")
+
+    print_lg("\n" + "=" * 50)
+    print_lg("MANUAL LOGIN REQUIRED")
+    print_lg(f"Please log in manually in the browser window.")
+    print_lg(f"Waiting up to {timeout} seconds for login detection...")
+    print_lg("=" * 50 + "\n")
+
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        if is_logged_in_LN(driver):
+            print_lg("Login detected! Proceeding...")
+            return True
+
+        elapsed = int(time.time() - start_time)
+        if elapsed % 10 == 0:
+            print_lg(f"Still waiting for login... ({elapsed}s elapsed)")
+
+        time.sleep(2)
+
+    print_lg("Login timeout reached. Exiting.")
+    return False
+
 
 def find_people_to_message(driver, search_keywords: list) -> list[dict]:
-    """Find people from search results"""
+    """Find people from search results based on keywords."""
     people = []
-
     try:
         for keyword in search_keywords:
-            print_lg(f"Searching for people with keyword: {keyword}")
-
-            # Go to people search
-            search_url = f"https://www.linkedin.com/search/results/people/?keywords={keyword}"
+            print_lg(f"Searching for: {keyword}")
+            search_url = (
+                f"https://www.linkedin.com/search/results/people/?keywords={keyword}"
+            )
             driver.get(search_url)
-            time.sleep(3)
+            time.sleep(5)  # Allow results to load
 
-            # Get people from results
-            person_cards = driver.find_elements(By.XPATH,
-                "//div[contains(@class, 'entity-result__item')]"
-            )[:10]  # Limit to 10 per keyword
-
-            for card in person_cards:
+            # Find all result items
+            cards = driver.find_elements(
+                By.XPATH, "//li[contains(@class, 'reusable-search__result-item')]"
+            )
+            for card in cards[:5]:  # Limit to top 5 per keyword for safety
                 try:
-                    name_elem = card.find_element(By.XPATH, ".//span[contains(@class, 'entity-result__title-text')]//a")
-                    name = name_elem.text.strip()
-                    profile_link = name_elem.get_attribute('href').split('?')[0]
+                    name_elem = card.find_element(
+                        By.XPATH,
+                        ".//span[contains(@class, 'entity-result__title-text')]//a",
+                    )
+                    name = name_elem.text.strip().split("\n")[0]
+                    link = name_elem.get_attribute("href").split("?")[0]
 
-                    # Get title/occupation
-                    try:
-                        title_elem = card.find_element(By.XPATH, ".//div[contains(@class, 'entity-result__primary-subtitle')]")
-                        title = title_elem.text.strip()
-                    except:
-                        title = "Professional"
-
-                    # Check if connect/message possible
-                    try:
-                        connect_btn = card.find_element(By.XPATH, ".//button[contains(@aria-label, 'Invite')]")
-                        can_message = True
-                        button_type = 'connect'
-                    except:
-                        try:
-                            message_btn = card.find_element(By.XPATH, ".//button[contains(@aria-label, 'Message')]")
-                            can_message = True
-                            button_type = 'message'
-                        except:
-                            can_message = False
-                            button_type = 'none'
-
-                    if can_message:
-                        person_info = {
-                            'name': name,
-                            'title': title,
-                            'profile_link': profile_link,
-                            'recruiter_id': profile_link.split('/in/')[-1].split('/')[0],
-                            'can_message': True,
-                            'is_free_message': True,  # Assume free for search results
-                            'button_type': button_type,
-                            'section': 'search_results'
+                    people.append(
+                        {
+                            "name": name,
+                            "profile_link": link,
+                            "recruiter_id": link.split("/in/")[-1].strip("/"),
                         }
-                        people.append(person_info)
-                        print_lg(f"Found: {name} - {title}")
-
-                except Exception as e:
-                    print_lg(f"Error parsing person card: {e}")
+                    )
+                    print_lg(f" Found: {name}")
+                except:
                     continue
-
     except Exception as e:
-        print_lg(f"Error in people search: {e}")
-
+        print_lg(f"Error searching for people: {e}")
     return people
 
-def send_bulk_messages(driver, people_list: list[dict], ai_client=None) -> None:
-    """Send messages to list of people"""
-    global messages_sent_today
-
-    for person in people_list:
-        if check_daily_message_limit():
-            print_lg("Daily message limit reached. Stopping.")
-            break
-
-        print_lg(f"\n--- Processing {person['name']} ---")
-
-        # Generate personalized message
-        subject, message_body = generate_personalized_message(
-            ai_client,
-            person,
-            "",  # No job description for general messaging
-            "Networking Opportunity",  # Generic job title
-            "Professional Network",  # Generic company
-            person.get('profile_link', '')
-        )
-
-        # Send message
-        success, error_msg = send_message_to_recruiter(
-            driver, person, subject, message_body
-        )
-
-        # Track result
-        track_sent_message(
-            "bulk_messaging",  # Generic job ID
-            "Bulk Messaging",
-            "Various Companies",
-            "https://www.linkedin.com/search/results/people/",
-            person, subject, message_body, success, "", error_msg
-        )
-
-        if success:
-            messages_sent_today += 1
-            print_lg(f"✅ Message sent to {person['name']}")
-        else:
-            print_lg(f"❌ Failed to message {person['name']}: {error_msg}")
-
-        # Respect delays
-        buffer(message_delay_seconds)
 
 def main():
-    """Main execution function"""
+    """Main execution entry point."""
     global messages_sent_today
 
     print_lg("=== LinkedIn Messaging Utility ===")
-    print_lg(f"Start Time: {datetime.now()}")
 
-    # Initialize AI client
-    ai_client = None
-    if use_AI:
-        try:
-            if ai_provider.lower() == "openai":
-                ai_client = ai_create_openai_client()
-            elif ai_provider.lower() == "deepseek":
-                ai_client = deepseek_create_client()
-            elif ai_provider.lower() == "gemini":
-                ai_client = gemini_create_client()
-            print_lg(f"AI client initialized: {ai_provider}")
-        except Exception as e:
-            print_lg(f"Failed to initialize AI client: {e}")
-
-    # Setup browser - already initialized by import
-    try:
-        print_lg("Browser initialized")
-    except Exception as e:
-        print_lg(f"Failed to setup browser: {e}")
+    # 1. Setup Browser
+    driver, wait, actions = setup_browser()
+    if not driver:
         return
 
     try:
-        # Login
-        if not is_logged_in_LN(driver):
-            if not login_LN(driver):
-                print_lg("Login failed. Exiting.")
-                return
-
-        # Search keywords for finding people
-        search_keywords = [
-            "software engineer",
-            "product manager",
-            "recruiter",
-            "hiring manager"
-        ]  # Can be made configurable
-
-        # Find people to message
-        people_to_message = find_people_to_message(driver, search_keywords)
-        print_lg(f"Found {len(people_to_message)} people to message")
-
-        if not people_to_message:
-            print_lg("No people found to message. Exiting.")
+        # 2. Login
+        if not login_with_timeout(driver):
             return
 
-        # Send messages
-        send_bulk_messages(driver, people_to_message, ai_client)
+        # 3. AI Client Setup
+        ai_client = None
+        if use_AI:
+            try:
+                print_lg(f"Initializing AI client ({ai_provider})...")
+                if ai_provider.lower() == "openai":
+                    from modules.ai.openaiConnections import ai_create_openai_client
+
+                    ai_client = ai_create_openai_client()
+                elif ai_provider.lower() == "deepseek":
+                    from modules.ai.deepseekConnections import deepseek_create_client
+
+                    ai_client = deepseek_create_client()
+                elif ai_provider.lower() == "gemini":
+                    from modules.ai.geminiConnections import gemini_create_client
+
+                    ai_client = gemini_create_client()
+            except Exception as e:
+                print_lg(f"AI initialization failed: {e}")
+
+        # 4. Search and Message
+        keywords = ["Technical Recruiter", "Hiring Manager", "Engineering Lead"]
+        people = find_people_to_message(driver, keywords)
+
+        print_lg(f"Found {len(people)} potential contacts.")
+
+        for person in people:
+            if check_daily_message_limit():
+                print_lg("Daily limit reached.")
+                break
+
+            print_lg(f"Processing: {person['name']}")
+
+            # Generate message
+            subject, message = generate_personalized_message(
+                ai_client,
+                person,
+                "",
+                "Networking",
+                "Professional Network",
+                person["profile_link"],
+            )
+
+            # Send message
+            message_data = {"subject": subject, "body": message}
+            success, error = send_message_to_recruiter(driver, person, message_data)
+
+            # Track
+            track_sent_message(
+                "manual_utility",
+                "Networking",
+                "N/A",
+                "N/A",
+                person,
+                subject,
+                message,
+                success,
+                "",
+                error,
+            )
+
+            if success:
+                messages_sent_today += 1
+                print_lg(f" Successfully messaged {person['name']}")
+            else:
+                print_lg(f" Failed to message {person['name']}: {error}")
+
+            buffer(message_delay_seconds)
 
     except Exception as e:
-        print_lg(f"Error in main execution: {e}")
+        print_lg(f"Fatal error in main: {e}")
     finally:
-        # Cleanup
-        try:
-            if driver:
-                driver.quit()
-            print_lg("Browser closed")
-        except:
-            pass
+        print_lg(f"Cleanup: Closing browser. Messages sent: {messages_sent_today}")
+        driver.quit()
 
-    print_lg(f"Total messages sent today: {messages_sent_today}")
-    print_lg("Messaging utility completed.")
 
 if __name__ == "__main__":
     main()
