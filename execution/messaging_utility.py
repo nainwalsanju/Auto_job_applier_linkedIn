@@ -2,7 +2,7 @@
 Messaging Utility for LinkedIn
 Standalone tool to send personalized messages to recruiters and connections.
 
-Author: Auto Job Applier Team
+Author: Sanjay Nainwal
 """
 
 # Imports

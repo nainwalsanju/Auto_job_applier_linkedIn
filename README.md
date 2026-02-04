@@ -16,7 +16,7 @@ This project follows a 3-layer architecture for reliability and maintainability:
 This architecture separates concerns to maximize reliability and ease of updates.
 
 ## 📽️ See it in Action
-[![Auto Job Applier demo video](https://github.com/GodsScion/Auto_job_applier_linkedIn/assets/100998531/429f7753-ebb0-499b-bc5e-5b4ee28c4f69)](https://youtu.be/gMbB1fWZDHw)
+[![Auto Job Applier demo video](https://github.com/nainwalsanju/Auto_job_applier_linkedIn/assets/100998531/429f7753-ebb0-499b-bc5e-5b4ee28c4f69)](https://youtu.be/gMbB1fWZDHw)
 Click on above image to watch the demo or use this link https://youtu.be/gMbB1fWZDHw
 
 
@@ -45,7 +45,7 @@ Click on above image to watch the demo or use this link https://youtu.be/gMbB1fW
   pip install -r requirements.txt
   ```
 3. Download and install latest version of [Google Chrome](https://www.google.com/chrome) in it's default location, visit https://www.google.com/chrome to download it's installer.
-4. Clone the current git repo or download it as a zip file, url to the latest update https://github.com/GodsScion/Auto_job_applier_linkedIn.
+4. Clone the current git repo or download it as a zip file, url to the latest update https://github.com/nainwalsanju/Auto_job_applier_linkedIn.
 5. (Not needed if you set `stealth_mode = True` in `config/settings.py` ) Download and install the appropriate [Chrome Driver](https://googlechromelabs.github.io/chrome-for-testing/) for Google Chrome and paste it in the location Chrome was installed, visit https://googlechromelabs.github.io/chrome-for-testing/ to download.
   <br> <br>
   ***OR*** 
@@ -178,7 +178,7 @@ Once your code is tested, your changes will be merged to the `main` branch in ne
   2. Examples for proper attestation:
   New feature example
   ```python
-  ##> ------ Sai Vignesh Golla : godsscion - Feature ------
+  ##> ------ Sanjay Nainwal : godsscion - Feature ------
   def alert_box(title: str, message: str) -> None:
     '''
     Shows an alert box with the given `title` and `message`.
@@ -197,7 +197,7 @@ Once your code is tested, your changes will be merged to the `main` branch in ne
     '''
     from pyautogui import alert
 
-  ##> ------ Sai Vignesh Golla : saivigneshgolla@outlook.com - Bug fix ------
+  ##> ------ Sanjay Nainwal : sanjaynainwal129@gmail.com - Bug fix ------
     return alert(message, title)
   ##<
   ```
@@ -287,15 +287,15 @@ By doing so, you can empower others in their job hunt, just as you've been empow
 As an independent developer, I pour my heart and soul into creating tools like this, driven by the genuine desire to make a positive impact. Your support, whether through donations or simply spreading the word, means the world to me and helps keep this project alive and thriving.
 
 You can connect and reach me out at:
-- LinkedIn  :  https://www.linkedin.com/in/saivigneshgolla/
-- Email     :  saivigneshgolla@outlook.com
+- LinkedIn  :  https://www.linkedin.com/in/sanjay-nainwal/
+- Email     :  sanjaynainwal129@gmail.com
 
 <br>
 
 Thank you for being part of this journey, and remember that together, we can make a real difference in the lives of job seekers worldwide.
 
 With heartfelt appreciation, <br>
-**Sai Vignesh Golla**
+**Sanjay Nainwal**
 
 <br>
 <br>
@@ -385,7 +385,7 @@ With heartfelt appreciation, <br>
 
 ## 📜 Disclaimer
 
-**This program is for educational purposes only. By downloading, using, copying, replicating, or interacting with this program or its code, you acknowledge and agree to abide by all the Terms, Conditions, Policies, and Licenses mentioned, which are subject to modification without prior notice. The responsibility of staying informed of any changes or updates bears upon yourself. For the latest Terms & Conditions, Licenses, or Policies, please refer to [Auto Job Applier](https://github.com/GodsScion/Auto_job_applier_linkedIn). Additionally, kindly adhere to and comply with LinkedIn's terms of service and policies pertaining to web scraping. Usage is at your own risk. The creators and contributors of this program emphasize that they bear no responsibility or liability for any misuse, damages, or legal consequences resulting from its usage.**
+**This program is for educational purposes only. By downloading, using, copying, replicating, or interacting with this program or its code, you acknowledge and agree to abide by all the Terms, Conditions, Policies, and Licenses mentioned, which are subject to modification without prior notice. The responsibility of staying informed of any changes or updates bears upon yourself. For the latest Terms & Conditions, Licenses, or Policies, please refer to [Auto Job Applier](https://github.com/nainwalsanju/Auto_job_applier_linkedIn). Additionally, kindly adhere to and comply with LinkedIn's terms of service and policies pertaining to web scraping. Usage is at your own risk. The creators and contributors of this program emphasize that they bear no responsibility or liability for any misuse, damages, or legal consequences resulting from its usage.**
 
 
 ## 🏛️ Terms and Conditions
@@ -405,7 +405,7 @@ Please consider the following:
 
 ## ⚖️ License
 
-Copyright (C) 2024 Sai Vignesh Golla  <saivigneshgolla@outlook.com>
+Copyright (C) 2024 Sanjay Nainwal  <sanjaynainwal129@gmail.com>
 
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
@@ -423,8 +423,8 @@ See [AGPLv3 LICENSE](LICENSE) for more info.
 <br>
 
 ## 🐧 Socials
-- **LinkedIn** : https://www.linkedin.com/in/saivigneshgolla/
-- **Email**    : saivigneshgolla@outlook.com
+- **LinkedIn** : https://www.linkedin.com/in/sanjay-nainwal/
+- **Email**    : sanjaynainwal129@gmail.com
 - **X/Twitter**: https://x.com/gods_scion
 - **Discord**  : godsscion
 
@@ -433,13 +433,13 @@ See [AGPLv3 LICENSE](LICENSE) for more info.
 - **Discord Server** : https://discord.gg/fFp7uUzWCY
 alternate link: https://discord.gg/ykfDjRFB
 - **GitHub**
-    - [All Discussions](https://github.com/GodsScion/Auto_job_applier_linkedIn/discussions)
-    - [Announcements](https://github.com/GodsScion/Auto_job_applier_linkedIn/discussions/categories/announcements)
-    - [General](https://github.com/GodsScion/Auto_job_applier_linkedIn/discussions/categories/general)
-    - [Feature requests or Ideas](https://github.com/GodsScion/Auto_job_applier_linkedIn/discussions/categories/feature-requests-or-ideas)
-    - [Polls](https://github.com/GodsScion/Auto_job_applier_linkedIn/discussions/categories/polls)
-    - [Community Flex](https://github.com/GodsScion/Auto_job_applier_linkedIn/discussions/categories/community-flex)
-    - [Support Q&A](https://github.com/GodsScion/Auto_job_applier_linkedIn/discussions/categories/support-q-a)
+    - [All Discussions](https://github.com/nainwalsanju/Auto_job_applier_linkedIn/discussions)
+    - [Announcements](https://github.com/nainwalsanju/Auto_job_applier_linkedIn/discussions/categories/announcements)
+    - [General](https://github.com/nainwalsanju/Auto_job_applier_linkedIn/discussions/categories/general)
+    - [Feature requests or Ideas](https://github.com/nainwalsanju/Auto_job_applier_linkedIn/discussions/categories/feature-requests-or-ideas)
+    - [Polls](https://github.com/nainwalsanju/Auto_job_applier_linkedIn/discussions/categories/polls)
+    - [Community Flex](https://github.com/nainwalsanju/Auto_job_applier_linkedIn/discussions/categories/community-flex)
+    - [Support Q&A](https://github.com/nainwalsanju/Auto_job_applier_linkedIn/discussions/categories/support-q-a)
 
 
 #### ℹ️ Version: 25.07.20.9.30 Community Alpha

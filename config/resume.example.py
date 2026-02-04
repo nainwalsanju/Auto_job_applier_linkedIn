@@ -1,13 +1,13 @@
 '''
-Author:     Sai Vignesh Golla
-LinkedIn:   https://www.linkedin.com/in/saivigneshgolla/
+Author:     Sanjay Nainwal
+LinkedIn:   https://www.linkedin.com/in/sanjay-nainwal/
 
-Copyright (C) 2024 Sai Vignesh Golla
+Copyright (C) 2024 Sanjay Nainwal
 
 License:    GNU Affero General Public License
             https://www.gnu.org/licenses/agpl-3.0.en.html
             
-GitHub:     https://github.com/GodsScion/Auto_job_applier_linkedIn
+GitHub:     https://github.com/nainwalsanju/Auto_job_applier_linkedIn
 
 version:    24.12.29.12.30
 '''
@@ -79,6 +79,6 @@ As an independent developer, I pour my heart and soul into creating tools like t
 Your support, whether through donations big or small or simply spreading the word, means the world to me and helps keep this project alive and thriving.
 
 Gratefully yours 🙏🏻,
-Sai Vignesh Golla
+Sanjay Nainwal
 '''
 ############################################################################################################
