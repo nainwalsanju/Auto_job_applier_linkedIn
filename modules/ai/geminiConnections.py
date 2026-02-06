@@ -50,6 +50,7 @@ def gemini_create_client():
     except Exception as e:
         error_message = f"Error occurred while configuring Gemini client. Make sure your API key and model name are correct."
         critical_error_log(error_message, e)
+        global showAiErrorAlerts
         if showAiErrorAlerts:
             if "Pause AI error alerts" == confirm(f"{error_message}\n{str(e)}", "Gemini Connection Error", ["Pause AI error alerts", "Okay Continue"]):
                 showAiErrorAlerts = False

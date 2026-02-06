@@ -40,6 +40,7 @@ def deepseek_create_client() -> OpenAI | None:
     except Exception as e:
         error_message = f"Error occurred while creating DeepSeek client. Make sure your API connection details are correct."
         critical_error_log(error_message, e)
+        global showAiErrorAlerts
         if showAiErrorAlerts:
             if "Pause AI error alerts" == confirm(f"{error_message}\n{str(e)}", "DeepSeek Connection Error", ["Pause AI error alerts", "Okay Continue"]):
                 showAiErrorAlerts = False
