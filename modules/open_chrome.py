@@ -13,6 +13,7 @@ version:    24.12.29.12.30
 '''
 
 from modules.helpers import make_directories
+from modules.bot_logger import LoggedWebDriver, log_step
 from config.settings import run_in_background, stealth_mode, disable_extensions, safe_mode, file_name, failed_file_name, logs_folder_path, generated_resume_path
 from config.questions import default_resume_path
 if stealth_mode:
@@ -48,6 +49,8 @@ try:
             print_lg("Downloading Chrome Driver... This may take some time. Undetected mode requires download every run!")
             driver = uc.Chrome(options=options)
     else: driver = webdriver.Chrome(options=options) #, service=Service(executable_path="C:\\Program Files\\Google\\Chrome\\chromedriver-win64\\chromedriver.exe"))
+    driver = LoggedWebDriver(driver)
+    log_step("DRIVER_INIT", "Wrapped WebDriver with logging")
     driver.maximize_window()
     wait = WebDriverWait(driver, 5)
     actions = ActionChains(driver)
